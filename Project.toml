@@ -1,0 +1,4 @@
+name = "Heptapus"
+uuid = "183adbe4-4102-11e9-3643-8738063a1e9c"
+authors = ["Lucas C Wilcox <lucas@swirlee.com>"]
+version = "0.1.0"
