@@ -10,9 +10,10 @@ function kernel!(::Dev, A, B) where Dev
     nothing
 end
 
-a = rand(Float32, 10240)
+a = rand(Float32, 10^9)
 b = similar(a)
 kernel!(b, a)
+@show Base.summarysize(a)/10^9
 
 @assert b == a
 
