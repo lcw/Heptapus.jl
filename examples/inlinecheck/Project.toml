@@ -1,0 +1,6 @@
+[deps]
+CUDAdrv = "c5f51814-7f29-56b8-a69c-e4d8f6be1fde"
+CUDAnative = "be33ccc6-a3ff-5ff2-a52e-74243cff1e17"
+Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
+CuArrays = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
+GPUifyLoops = "ba82f77b-6841-5d2e-bd9f-4daf811aec27"
