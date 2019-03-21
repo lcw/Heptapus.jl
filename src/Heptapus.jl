@@ -46,8 +46,6 @@ Use `nvprof` to profile `command` and compute for each kernel executed:
   - local loads or stores (`Bool`);
   - floaing point type used; and
   - mixed floating point operations (`Bool`).
-
-The data is returned as a `Table` from TypedTables.jl.
 """
 struct Roofline
     t::Table
