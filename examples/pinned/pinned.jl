@@ -42,7 +42,7 @@ function empiricalbandwidth(nbytes=1024^2; devicenumber=0, ntests=10, pinned=fal
     record(t1, stm)
     synchronize(t1)
     t_htod = elapsed(t0, t1)
-    bandwidth_htod = nbytes*ntests/(t_dtoh*1e9)
+    bandwidth_htod = nbytes*ntests/(t_htod*1e9)
 
     pinned && Mem.free(a)
     Mem.free(b)
