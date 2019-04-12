@@ -41,7 +41,7 @@ version = "0.6.3"
 
 [[CUDAdrv]]
 deps = ["CUDAapi", "Libdl", "Printf"]
-git-tree-sha1 = "71ad3c13bce5665f0d7636da17b2d5d07d35bf09"
+git-tree-sha1 = "bd2b0ed089a6aabff9a51cc513179e0f68d5d05a"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaGPU/CUDAdrv.jl.git"
 uuid = "c5f51814-7f29-56b8-a69c-e4d8f6be1fde"
@@ -49,7 +49,7 @@ version = "2.1.0"
 
 [[CUDAnative]]
 deps = ["Adapt", "CUDAapi", "CUDAdrv", "DataStructures", "InteractiveUtils", "LLVM", "Libdl", "Logging", "Pkg", "Printf", "TimerOutputs"]
-git-tree-sha1 = "410321ebf52963aacdb1ef91e4d604bbcd12f012"
+git-tree-sha1 = "5c6996c6007bc4a79f3afcd25ee4c71aaaef1da9"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaGPU/CUDAnative.jl.git"
 uuid = "be33ccc6-a3ff-5ff2-a52e-74243cff1e17"
@@ -81,7 +81,7 @@ version = "4.0.0"
 
 [[CuArrays]]
 deps = ["AbstractFFTs", "Adapt", "CUDAapi", "CUDAdrv", "CUDAnative", "GPUArrays", "LinearAlgebra", "MacroTools", "NNlib", "Printf", "Random", "Requires", "SparseArrays", "TimerOutputs"]
-git-tree-sha1 = "83cbe780797dfa42eeceb884743ebb5a3e316ff3"
+git-tree-sha1 = "f202c795376be7a2f759dee02809f315071fecda"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaGPU/CuArrays.jl.git"
 uuid = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
@@ -119,13 +119,17 @@ version = "0.5.0"
 
 [[GPUArrays]]
 deps = ["Adapt", "FFTW", "FillArrays", "LinearAlgebra", "Printf", "Random", "Serialization", "StaticArrays", "Test"]
-git-tree-sha1 = "2b96d7f25fbea82c08a736d78cbf14df8d2100a5"
+git-tree-sha1 = "2d4f5ab54d13040bfe2c514b5c36d53003271ad0"
+repo-rev = "master"
+repo-url = "https://github.com/JuliaGPU/GPUArrays.jl.git"
 uuid = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
-version = "0.6.1"
+version = "0.7.0"
 
 [[GPUifyLoops]]
-deps = ["Cassette", "Pkg", "Requires", "StaticArrays", "Test"]
+deps = ["Cassette", "Requires", "StaticArrays"]
 git-tree-sha1 = "f82228e1f7cf89b604aabbb77701410d84585a55"
+repo-rev = "master"
+repo-url = "https://github.com/vchuravy/GPUifyLoops.jl.git"
 uuid = "ba82f77b-6841-5d2e-bd9f-4daf811aec27"
 version = "0.2.2"
 
