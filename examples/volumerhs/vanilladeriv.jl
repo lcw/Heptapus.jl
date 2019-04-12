@@ -301,22 +301,22 @@ function volumerhs_v3!(::Val{3},
     r_rhsE = @scratch eltype(rhs) (Nq, Nq, Nq) 2
 
     @inbounds @loop for e in (1:nelem; blockIdx().x)
-        @loop for j in (1:Nq; threadIdx().y)
-            @loop for i in (1:Nq; threadIdx().x)
-                 for k in 1:Nq
-                     r_rhsρ[k, i, j] = zero(eltype(rhs))
-                #     r_rhsU[k, i, j] = zero(eltype(rhs))
-                #     r_rhsV[k, i, j] = zero(eltype(rhs))
-                #     r_rhsW[k, i, j] = zero(eltype(rhs))
-                #     r_rhsE[k, i, j] = zero(eltype(rhs))
-                end
+        # @loop for j in (1:Nq; threadIdx().y)
+        #     @loop for i in (1:Nq; threadIdx().x)
+        #          for k in 1:Nq
+        #              r_rhsρ[k, i, j] = zero(eltype(rhs))
+        #              r_rhsU[k, i, j] = zero(eltype(rhs))
+        #              r_rhsV[k, i, j] = zero(eltype(rhs))
+        #              r_rhsW[k, i, j] = zero(eltype(rhs))
+        #              r_rhsE[k, i, j] = zero(eltype(rhs))
+        #         end
 
-                # fetch D into shared
-                # s_D[i, j] = D[i, j]
-            end
-        end
+        #         # fetch D into shared
+        #         s_D[i, j] = D[i, j]
+        #     end
+        # end
 
-        # @unroll for k in 1:Nq
+        # for k in 1:Nq
         #     @synchronize
         #     @loop for j in (1:Nq; threadIdx().y)
         #         @loop for i in (1:Nq; threadIdx().x)
@@ -476,7 +476,7 @@ function volumerhs_v3_1!(::Val{3},
             end
         end
 
-        @unroll for k in 1:Nq
+        for k in 1:Nq
             @synchronize
             for j = threadIdx().y
                 for i = threadIdx().x
@@ -621,7 +621,7 @@ end
 
 
 function main()
-    # CUDAnative.timings!()
+    CUDAnative.timings!()
 
     parsed_args = parse_commandline()
 
@@ -651,15 +651,15 @@ function main()
     #
     # volumerhs_v2!
     #
-    #fill!(rhs, 0)
-    #@launch(CUDA(), threads=(N+1, N+1, N+1), blocks=nelem,
-    #      volumerhs_v2!(Val(3), Val(N), Val(nmoist), Val(ntrace),
-    #                    rhs, Q, vgeo, DFloat(grav), D, nelem))
-    #norm_v2 = norm(rhs)
+    # fill!(rhs, 0)
+    # @launch(CUDA(), threads=(N+1, N+1, N+1), blocks=nelem,
+    #         volumerhs_v2!(Val(3), Val(N), Val(nmoist), Val(ntrace),
+    #                       rhs, Q, vgeo, DFloat(grav), D, nelem))
+    # norm_v2 = norm(rhs)
     # CUDAdrv.@profile for _ = 1:ntrials
     #     @launch(CUDA(), threads=(N+1, N+1, N+1), blocks=nelem,
-    #           volumerhs_v2!(Val(3), Val(N), Val(nmoist), Val(ntrace), rhs,
-    #                         Q, vgeo, DFloat(grav), D, nelem))
+    #             volumerhs_v2!(Val(3), Val(N), Val(nmoist), Val(ntrace), rhs,
+    #                           Q, vgeo, DFloat(grav), D, nelem))
     # end
 
     #
@@ -667,16 +667,8 @@ function main()
     #
     fill!(rhs, 0)
     @launch(CUDA(), threads=(N+1, N+1), blocks=nelem,
-            volumerhs_v3!(Val(3),
-                       Val(N),
-                       Val(nmoist),
-                       Val(ntrace),
-                       rhs,
-                       Q,
-                       vgeo,
-                       DFloat(grav),
-                       D,
-                       nelem))
+            volumerhs_v3!(Val(3), Val(N), Val(nmoist), Val(ntrace), rhs, Q,
+                          vgeo, DFloat(grav), D, nelem))
     #norm_v3 = norm(rhs)
     #CUDAdrv.@profile for _ = 1:ntrials
     #    @launch(CUDA(), threads=(N+1, N+1), blocks=nelem, maxregs=255,
@@ -701,7 +693,7 @@ function main()
     #@assert norm_v2 ≈ norm_v3
     #@assert norm_v2 ≈ norm_v3_1
 
-    #CUDAnative.timings()
+    CUDAnative.timings()
 
     nothing
 end
