@@ -1,9 +1,5 @@
 using CUDAdrv
 
-const STREAM_DEFAULT       = 0x00
-const STREAM_NON_BLOCKING  = 0x01
-
-
 """
     empiricalbandwidth(nbytes=2*1024^3; devicenumber=0, numtests=10)
 
@@ -15,7 +11,7 @@ function empiricalbandwidth(nbytes=1024^2; devicenumber=0, ntests=10, pinned=fal
     dev = CuDevice(devicenumber)
     ctx = CuContext(dev)
     #stm = CuStream()
-    stm = CuStream(STREAM_NON_BLOCKING)
+    stm = CuStream(CUDAdrv.STREAM_NON_BLOCKING)
 
     d = rand(Char, nbytes)
     a = pinned ? Mem.alloc(Mem.Host, nbytes) : pointer(d)

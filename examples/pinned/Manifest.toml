@@ -11,11 +11,9 @@ version = "0.6.3"
 
 [[CUDAdrv]]
 deps = ["CUDAapi", "Libdl", "Printf"]
-git-tree-sha1 = "8577439c437ae08df927b4a2104a7fd63b83d442"
-repo-rev = "tb/pinned"
-repo-url = "https://github.com/JuliaGPU/CUDAdrv.jl.git"
+git-tree-sha1 = "ac4ff4daf5d5c031ad52ae2b360a99dbd2a423ce"
 uuid = "c5f51814-7f29-56b8-a69c-e4d8f6be1fde"
-version = "2.0.0+"
+version = "3.0.0"
 
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
