@@ -1,8 +1,6 @@
 using GPUifyLoops
 
-kernel!(A::Array, B::Array) = kernel!(CPU(), A, B)
-function kernel!(::Dev, A, B) where Dev
-    @setup Dev
+function kernel!(A, B)
     @inbounds @loop for i in (1:size(A,1);
                               (blockIdx().x-1)*blockDim().x + threadIdx().x)
         A[i] = B[i]
@@ -24,7 +22,7 @@ kernel!(b, a)
     @eval function kernel!(A::CuArray, B::CuArray)
         threads = 1024
         blocks = ceil(Int, size(A,1)/threads)
-        @cuda(threads=threads, blocks=blocks, kernel!(CUDA(), A, B))
+        @launch(CUDA(), threads=threads, blocks=blocks, kernel!(A, B))
     end
 
     ca = CuArray(a)
