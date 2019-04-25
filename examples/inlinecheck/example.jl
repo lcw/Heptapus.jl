@@ -1,8 +1,6 @@
 using GPUifyLoops, Cthulhu, CuArrays, CUDAnative
 
-kernel!(A::Array, B::Array) = kernel!(CPU(), Val(size(B,2)), A, B)
-function kernel!(::Dev, ::Val{nbcol}, A, B) where {Dev, nbcol}
-    @setup Dev
+function kernel!(::Val{nbcol}, A, B) where {nbcol}
     @inbounds @loop for i in (1:size(A,1);
                               (blockIdx().x-1)*blockDim().x + threadIdx().x)
         a = zero(eltype(B))
@@ -17,7 +15,7 @@ end
 @eval function kernel!(A::CuArray, B::CuArray)
   threads = 1024
   blocks = ceil(Int, size(A,1)/threads)
-  @cuda(threads=threads, blocks=blocks, kernel!(CUDA(), Val(size(B,2)), A, B))
+  @launch(CUDA(), threads=threads, blocks=blocks, kernel!(Val(size(B,2)), A, B))
 end
 
 b = rand(Float32, 10^8, 10)
@@ -27,7 +25,7 @@ ca = similar(cb, size(b,1))
 
 @static if isdefined(Base, :active_repl)
     # Example of how to decend using Cthulhu
-    args = (CUDA(), Val(size(cb,2)), ca, cb)
+    args = (Val(size(cb,2)), ca, cb)
     cuargs = map(cudaconvert, args)
     tt = map(typeof, cuargs)
     descend(kernel!, Tuple{tt...})

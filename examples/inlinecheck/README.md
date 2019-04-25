@@ -12,11 +12,12 @@ Once we have that we can run the LLVM `opt` tool from the shell to convert the
 source to keep the llvm tools around or grab them
 
 ```
-mkdir llvm
-cd llvm
-wget https://github.com/staticfloat/LLVMBuilder/releases/download/v6.0.1-4%2Bnowasm/LLVM.v6.0.1.x86_64-linux-gnu-gcc7.tar.gz
+mkdir -P llvm/6.0.1
+cd llvm/6.0.1
+wget https://github.com/staticfloat/LLVMBuilder/releases/download/v6.0.1-5%2Bnowasm/LLVM.v6.0.1.x86_64-linux-gnu-gcc7.tar.gz
 tar -xzvf LLVM.v6.0.1.x86_64-linux-gnu-gcc7.tar.gz
-cd ..
+rm -f LLVM.v6.0.1.x86_64-linux-gnu-gcc7.tar.gz
+cd ../..
 ```
 
 We then need to setup our environment so that we can run similar passes to
@@ -25,7 +26,7 @@ Julia.  The variables below were taken from [perfenv.sh][4] of from
 julia llvm passes (but is not exactly what CUDAnative [runs][5].
 
 ```
-set -x JULIA_PATH $HOME/opt/julia/1.2.0-DEV.416
+set -x JULIA_PATH (which julia)
 set LLVM_PATH $HOME/opt/llvm/6.0.1/tools
 set -x OPT $LLVM_PATH/opt
 set -x OPTFLAGS -load=$JULIA_PATH/lib/libjulia.so
