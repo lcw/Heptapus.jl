@@ -8,7 +8,7 @@ LLC := $(SRCDIR)/usr/tools/clang
 CUDA_PATH ?= /usr/lib/cuda
 
 vanilladeriv: vanilladeriv.cu | deps.jl
-	$(CLANG) -L$(CUDA_PATH)/lib64 --cuda-path=$(CUDA_PATH) --cuda-gpu-arch=sm_70 -lcudart -o $@ $< 
+	$(CLANG) -L$(CUDA_PATH)/lib64 --cuda-path=$(CUDA_PATH) --cuda-gpu-arch=sm_70 -lcudart -Wl,-rpath=$(CUDA_PATH)/lib64,--enable-new-dtags -o $@ $< 
 
 vanilladeriv.ll: vanilladeriv.cu | deps.jl
 	$(CLANG) -L$(CUDA_PATH)/lib64 --cuda-path=$(CUDA_PATH) --cuda-gpu-arch=sm_70 -S -emit-llvm --cuda-device-only -o $@ $< 
