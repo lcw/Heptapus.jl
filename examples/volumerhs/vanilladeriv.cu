@@ -496,7 +496,7 @@ int main(int argc, char **argv){
   dim3 B2(Nq,Nq,Nq);
   dim3 B3(Nq,Nq,1);
 
-  int Ntests = 100;
+  int Ntests = 1;
   for(int test=0;test<Ntests;++test){
     volumerhs_v2<Nq, Np, nmoist, ntrace, nvar> <<< G, B2 >>> (c_rhs_v2, c_Q, c_vgeo, grav, c_D, nelem);
   }
