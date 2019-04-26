@@ -6,6 +6,27 @@ using GPUifyLoops
 using StaticArrays
 using ArgParse
 
+@inline function GPUifyLoops.Cassette.overdub(::GPUifyLoops.Ctx, ::typeof(*), a::Float32, b::Float32)
+  Base.llvmcall("""
+           %x = fmul contract float %0, %1
+           ret float %x
+           """, Float32, Tuple{Float32, Float32}, a, b)
+end
+
+@inline function GPUifyLoops.Cassette.overdub(::GPUifyLoops.Ctx, ::typeof(+), a::Float32, b::Float32)
+  Base.llvmcall("""
+           %x = fadd contract float %0, %1
+           ret float %x
+           """, Float32, Tuple{Float32, Float32}, a, b)
+end
+
+@inline function GPUifyLoops.Cassette.overdub(::GPUifyLoops.Ctx, ::typeof(-), a::Float32, b::Float32)
+  Base.llvmcall("""
+           %x = fsub contract float %0, %1
+           ret float %x
+           """, Float32, Tuple{Float32, Float32}, a, b)
+end
+
 # {{{ constants
 # note the order of the fields below is also assumed in the code.
 const _nstate = 5
@@ -122,7 +143,7 @@ function volumerhs_v2!(::Val{3}, ::Val{N}, ::Val{nmoist},
                     rhsW -= ρ * gravity
 
                     # loop of ξ-grid lines
-                    for n = 1:Nq
+                    @unroll for n = 1:Nq
                         MJI_Dni = MJI * s_D[n, i]
                         MJI_Dnj = MJI * s_D[n, j]
                         MJI_Dnk = MJI * s_D[n, k]
@@ -161,7 +182,7 @@ function volumerhs_v2!(::Val{3}, ::Val{N}, ::Val{nmoist},
         # FIXME: Currently just passive advection
         # TODO: This should probably be unrolled by some factor
         rhsmoist = zero(eltype(rhs))
-        for m = 1:nmoist
+        @unroll for m = 1:nmoist
             s = _nstate + m
 
             @synchronize
@@ -199,7 +220,7 @@ function volumerhs_v2!(::Val{3}, ::Val{N}, ::Val{nmoist},
                         MJI = vgeo[i, j, k, _MJI, e]
 
                         rhsmoist = zero(DFloat)
-                        for n = 1:Nq
+                        @unroll for n = 1:Nq
                             MJI_Dni = MJI * s_D[n, i]
                             MJI_Dnj = MJI * s_D[n, j]
                             MJI_Dnk = MJI * s_D[n, k]
@@ -217,7 +238,7 @@ function volumerhs_v2!(::Val{3}, ::Val{N}, ::Val{nmoist},
         # Loop over trace variables
         # TODO: This should probably be unrolled by some factor
         rhstrace = zero(eltype(rhs))
-        for m = 1:ntrace
+        @unroll for m = 1:ntrace
             s = _nstate + nmoist + m
 
             @synchronize
@@ -255,7 +276,7 @@ function volumerhs_v2!(::Val{3}, ::Val{N}, ::Val{nmoist},
                         MJI = vgeo[i, j, k, _MJI, e]
 
                         rhstrace = zero(DFloat)
-                        for n = 1:Nq
+                        @unroll for n = 1:Nq
                             MJI_Dni = MJI * s_D[n, i]
                             MJI_Dnj = MJI * s_D[n, j]
                             MJI_Dnk = MJI * s_D[n, k]
@@ -463,7 +484,7 @@ function volumerhs_v3_1!(::Val{3},
     @inbounds for e = blockIdx().x
         for j = threadIdx().y
             for i = threadIdx().x
-                for k in 1:Nq
+                @unroll for k in 1:Nq
                     r_rhsρ[k, i, j] = zero(eltype(rhs))
                     r_rhsU[k, i, j] = zero(eltype(rhs))
                     r_rhsV[k, i, j] = zero(eltype(rhs))
@@ -532,7 +553,7 @@ function volumerhs_v3_1!(::Val{3},
                     r_HE = MJ * (ζx * fluxE_x + ζy * fluxE_y + ζz * fluxE_z)
 
                     # one shared access per 10 flops
-                    for n = 1:Nq
+                    @unroll for n = 1:Nq
                         Dkn = s_D[k, n]
 
                         r_rhsρ[n,i,j] += Dkn * r_Hρ
@@ -552,7 +573,7 @@ function volumerhs_v3_1!(::Val{3},
                 for i = threadIdx().x
 
                     # loop of ξ-grid lines
-                    for n = 1:Nq
+                    @unroll for n = 1:Nq
                         Dni = s_D[n, i]
                         Dnj = s_D[n, j]
 
@@ -577,7 +598,7 @@ function volumerhs_v3_1!(::Val{3},
 
         for j = threadIdx().y
             for i = threadIdx().x
-                for k in 1:Nq
+                @unroll for k in 1:Nq
                     MJI = vgeo[i, j, k, _MJI, e]
 
                     rhs[i, j, k, _U, e] += MJI*r_rhsU[k, i, j]
