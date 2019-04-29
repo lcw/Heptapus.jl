@@ -17,6 +17,9 @@ volumerhs: volumerhs.cu | deps.jl
 volumerhs.ll: volumerhs.cu | deps.jl
 	$(CLANG) -O3 --cuda-path=$(CUDA_PATH) --cuda-gpu-arch=sm_70 -S -emit-llvm --cuda-device-only -o $@ $< 
 
+volumerhs.opt.ll: volumerhs.ll | deps.jl
+	$(OPT) -O3 -o $@ -S $<
+
 volumerhs.bc: volumerhs.ll | deps.jl
 	$(LINK) $< $(CUDA_PATH)/nvvm/libdevice/libdevice.10.bc -o $@.link
 	$(OPT) -nvvm-reflect -O3 $@.link -o $@
