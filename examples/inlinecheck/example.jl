@@ -38,4 +38,8 @@ kernel!(ca, cb)
 kernel!(ca, cb)
 
 # Dump intermediate files into the tmp directory
+#
+# Note: To get the disassembler to work you need to point CUDAnative to the
+# cuda 9.0 installation.  This is done by setting CUDA_HOME before building
+# CUDAnative, e.g., `set -X CUDA_HOME /usr/local/cuda-9.0`.
 @device_code dir="tmp" kernel!(ca, cb)
