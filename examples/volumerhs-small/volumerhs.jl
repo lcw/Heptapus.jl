@@ -34,7 +34,7 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
     i = threadIdx().x
 
     # fetch D into shared
-    s_D[i, j] = D[i, j]
+    @inbounds s_D[i, j] = D[i, j]
 
     @inbounds @unroll for k in 1:Nq
         r_rhsρ[k] = zero(eltype(rhs))
