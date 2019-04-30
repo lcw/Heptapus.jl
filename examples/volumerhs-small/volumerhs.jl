@@ -45,7 +45,7 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
     end
 
     @inbounds @unroll for k in 1:Nq
-        @synchronize
+        sync_threads()
 
         # Load values will need into registers
         MJ = vgeo[i, j, k, _MJ, e]
@@ -110,7 +110,7 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
 
         r_rhsW[k] -= MJ * ρ * gravity
 
-        @synchronize
+        sync_threads()
 
         # loop of ξ-grid lines
         @unroll for n = 1:Nq
