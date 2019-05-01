@@ -5,6 +5,33 @@ using CuArrays
 using StaticArrays
 using GPUifyLoops # for @unroll macro
 
+Base.@propagate_inbounds function Base.getindex(v::MArray, i::Int)
+    @boundscheck checkbounds(v,i)
+    T = eltype(v)
+
+    @assert isbitstype(T) "Only isbits is supported on the device"
+    return GC.@preserve v begin
+        ptr  = pointer_from_objref(v)
+        dptr = reinterpret(CUDAnative.DevicePtr{T, CUDAnative.AS.Local}, ptr)
+        unsafe_load(dptr, i)
+    end
+end
+
+Base.@propagate_inbounds function Base.setindex!(v::MArray, val, i::Int)
+    @boundscheck checkbounds(v,i)
+    T = eltype(v)
+
+    @assert isbitstype(T) "Only isbits is supported on the device"
+    GC.@preserve v begin
+    ptr  = pointer_from_objref(v)
+        dptr = reinterpret(CUDAnative.DevicePtr{T, CUDAnative.AS.Local}, ptr)
+        unsafe_store!(dptr, convert(T, val), i)
+    end
+
+    return val
+end
+
+
 # note the order of the fields below is also assumed in the code.
 const _nstate = 5
 const _ρ, _U, _V, _W, _E = 1:_nstate
