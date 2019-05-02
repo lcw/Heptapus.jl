@@ -5,6 +5,62 @@ using CuArrays
 using StaticArrays
 using GPUifyLoops # for @unroll macro
 
+# Base.@propagate_inbounds function Base.getindex(v::MArray, i::Int)
+#     @boundscheck checkbounds(v,i)
+#     T = eltype(v)
+# 
+#     @assert isbitstype(T) "Only isbits is supported on the device"
+#     return GC.@preserve v begin
+#         ptr  = pointer_from_objref(v)
+#         dptr = reinterpret(CUDAnative.DevicePtr{T, CUDAnative.AS.Local}, ptr)
+#         unsafe_load(dptr, i)
+#     end
+# end
+# 
+# Base.@propagate_inbounds function Base.setindex!(v::MArray, val, i::Int)
+#     @boundscheck checkbounds(v,i)
+#     T = eltype(v)
+# 
+#     @assert isbitstype(T) "Only isbits is supported on the device"
+#     GC.@preserve v begin
+#     ptr  = pointer_from_objref(v)
+#         dptr = reinterpret(CUDAnative.DevicePtr{T, CUDAnative.AS.Local}, ptr)
+#         unsafe_store!(dptr, convert(T, val), i)
+#     end
+# 
+#     return val
+# end
+
+for (f, T) in Base.Iterators.product((:add, :mul, :sub), (Float32, Float64))
+    name = Symbol("$(f)_float_contract")
+    if T === Float32
+        llvmt = "float"
+    elseif T === Float64
+        llvmt = "double"
+    end
+
+    ir = """
+    %x = f$f contract $llvmt %0, %1
+    ret $llvmt %x
+    """
+    @eval begin
+        # the @pure is necessary so that we can constant propagate.
+        Base.@pure function $name(a::$T, b::$T)
+            @Base._inline_meta
+            Base.llvmcall($ir, $T, Tuple{$T, $T}, a, b)
+        end
+    end
+end
+
+import Base: +, *, -
+
++(a::Float64, b::Float64) = add_float_contract(a, b)
++(a::Float32, b::Float32) = add_float_contract(a, b)
+*(a::Float64, b::Float64) = mul_float_contract(a, b)
+*(a::Float32, b::Float32) = mul_float_contract(a, b)
+-(a::Float64, b::Float64) = sub_float_contract(a, b)
+-(a::Float32, b::Float32) = sub_float_contract(a, b)
+
 # note the order of the fields below is also assumed in the code.
 const _nstate = 5
 const _ρ, _U, _V, _W, _E = 1:_nstate
@@ -45,8 +101,6 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
     end
 
     @inbounds @unroll for k in 1:Nq
-        sync_threads()
-
         # Load values will need into registers
         MJ = vgeo[i, j, k, _MJ, e]
         ξx, ξy, ξz = vgeo[i,j,k,_ξx,e], vgeo[i,j,k,_ξy,e], vgeo[i,j,k,_ξz,e]
@@ -78,6 +132,8 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
         fluxV_z = ρinv * W * V
         fluxW_z = ρinv * W * W + P
         fluxE_z = ρinv * W * (E + P)
+
+        sync_threads()
 
         s_F[i, j,  _ρ] = MJ * (ξx * fluxρ_x + ξy * fluxρ_y + ξz * fluxρ_z)
         s_F[i, j,  _U] = MJ * (ξx * fluxU_x + ξy * fluxU_y + ξz * fluxU_z)
