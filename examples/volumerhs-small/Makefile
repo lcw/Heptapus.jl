@@ -3,7 +3,7 @@ SRCDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 # nvcc -G -ptx
 
 deps.jl:
-	julia build_LLVM.v6.0.1.jl
+	julia --project build_LLVM.v6.0.1.jl
 
 CLANG := $(SRCDIR)/usr/tools/clang
 LLC := $(SRCDIR)/usr/tools/llc
