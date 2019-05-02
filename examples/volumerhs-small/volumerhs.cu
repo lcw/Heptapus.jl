@@ -18,37 +18,37 @@
 #endif
 
 // note the order of the fields below is also assumed in the code.
-const int _nstate = 5;
+const int64_t _nstate = 5;
 
-const int _R = 0, _U  = 1, _V  = 2, _W = 3, _E = 4;
+const int64_t _R = 0, _U  = 1, _V  = 2, _W = 3, _E = 4;
 
-const int _nvgeo = 14;
-const int _XIx   = 0;
-const int _ETAx  = 1;
-const int _ZETAx = 2;
-const int _XIy   = 3;
-const int _ETAy  = 4;
-const int _ZETAy = 5;
-const int _XIz   = 6;
-const int _ETAz  = 7;
-const int _ZETAz = 8;
-const int _MJ    = 9;
-const int _MJI   = 10;
-const int _x     = 11;
-const int _y     = 12;
-const int _z     = 13;
+const int64_t _nvgeo = 14;
+const int64_t _XIx   = 0;
+const int64_t _ETAx  = 1;
+const int64_t _ZETAx = 2;
+const int64_t _XIy   = 3;
+const int64_t _ETAy  = 4;
+const int64_t _ZETAy = 5;
+const int64_t _XIz   = 6;
+const int64_t _ETAz  = 7;
+const int64_t _ZETAz = 8;
+const int64_t _MJ    = 9;
+const int64_t _MJI   = 10;
+const int64_t _x     = 11;
+const int64_t _y     = 12;
+const int64_t _z     = 13;
 
 #define grav  ((dfloat) 9.81)
 #define gdm1  ((dfloat) 0.4)
 
 
-template <int Nq, int Np, int nvar>
+template <int64_t Nq, int64_t Np, int64_t nvar>
   __global__ void volumerhs(dfloat * __restrict__ rhs,
                             const dfloat * __restrict__ Q,
                             const dfloat * __restrict__ vgeo,
                             const dfloat gravity,
                             const dfloat * __restrict__ D,
-                            const int nelem){
+                            const int64_t nelem){
 
   __shared__ dfloat s_D[Nq][Nq];
   __shared__ dfloat s_F[Nq][Nq][_nstate];
@@ -60,14 +60,14 @@ template <int Nq, int Np, int nvar>
   dfloat r_rhsW[Nq];
   dfloat r_rhsE[Nq];
 
-  int e = blockIdx.x;
-  int j = threadIdx.y;
-  int i = threadIdx.x;
+  int64_t e = blockIdx.x;
+  int64_t j = threadIdx.y;
+  int64_t i = threadIdx.x;
 
   s_D[j][i] = D[j*Nq+i];
 
 #pragma unroll Nq
-  for(int k=0;k<Nq;++k){
+  for(int64_t k=0;k<Nq;++k){
     r_rhsR[k] = 0;
     r_rhsU[k] = 0;
     r_rhsV[k] = 0;
@@ -76,12 +76,12 @@ template <int Nq, int Np, int nvar>
   }
 
 #pragma unroll Nq
-  for(int k=0;k<Nq;++k){
+  for(int64_t k=0;k<Nq;++k){
 
     __syncthreads();
 
-    // Load values will need into registers
-    int gid = i + j*Nq + k*Nq*Nq + e*Np*_nvgeo;
+    // Load values will need int64_to registers
+    int64_t gid = i + j*Nq + k*Nq*Nq + e*Np*_nvgeo;
 
     dfloat MJ = vgeo[gid + _MJ*Np];
     dfloat XIx = vgeo[gid + _XIx*Np];
@@ -96,7 +96,7 @@ template <int Nq, int Np, int nvar>
     dfloat z = vgeo[gid +  _z*Np];
 
 
-    int qid = i + j*Nq + k*Nq*Nq + e*Np*nvar;
+    int64_t qid = i + j*Nq + k*Nq*Nq + e*Np*nvar;
 
     dfloat R = Q[qid + _R*Np];
     dfloat U = Q[qid + _U*Np];
@@ -146,7 +146,7 @@ template <int Nq, int Np, int nvar>
 
     // one shared access per 10 flops
 #pragma unroll Nq
-    for(int n=0;n<Nq;++n){
+    for(int64_t n=0;n<Nq;++n){
       dfloat  Dkn = s_D[k][n];
 
       r_rhsR[n] += Dkn * r_HR;
@@ -162,7 +162,7 @@ template <int Nq, int Np, int nvar>
 
     // loop of XI-grid lines
 #pragma unroll Nq
-    for(int n=0;n<Nq;++n){
+    for(int64_t n=0;n<Nq;++n){
       dfloat Dni = s_D[n][i];
       dfloat Dnj = s_D[n][j];
 
@@ -184,11 +184,11 @@ template <int Nq, int Np, int nvar>
   }
 
 #pragma unroll Nq
-  for(int k=0;k<Nq;++k){
-    int gid = i + j*Nq + k*Nq*Nq + e*Np*_nvgeo;
+  for(int64_t k=0;k<Nq;++k){
+    int64_t gid = i + j*Nq + k*Nq*Nq + e*Np*_nvgeo;
     dfloat MJI = vgeo[gid +  _MJI*Np];
 
-    int qid = i + j*Nq + k*Nq*Nq + e*Np*nvar;
+    int64_t qid = i + j*Nq + k*Nq*Nq + e*Np*nvar;
 
     rhs[qid+_U*Np] += MJI*r_rhsU[k];
     rhs[qid+_V*Np] += MJI*r_rhsV[k];
@@ -198,12 +198,12 @@ template <int Nq, int Np, int nvar>
   }
 }
 
-void randArray(int N, dfloat base, dfloat range, dfloat **q, dfloat **c_q){
+void randArray(int64_t N, dfloat base, dfloat range, dfloat **q, dfloat **c_q){
 
   *q = (dfloat*) calloc(N, sizeof(dfloat));
   cudaMalloc(c_q, N*sizeof(dfloat));
 
-  for(int n=0;n<N;++n){
+  for(int64_t n=0;n<N;++n){
     q[0][n] = base + drand48()*range;
   }
 
@@ -215,21 +215,21 @@ int main(int argc, char **argv){
 
   srand48(1234);
 
-  const int N = POLYNOMIAL_ORDER;
-  const int nelem = 4000;
+  const int64_t N = POLYNOMIAL_ORDER;
+  const int64_t nelem = 4000;
 
-  const int Nq = N+1;
-  const int Np = Nq*Nq*Nq;
+  const int64_t Nq = N+1;
+  const int64_t Np = Nq*Nq*Nq;
 
-  const int Ntotal = Np*nelem*_nstate;
+  const int64_t Ntotal = Np*nelem*_nstate;
 
   dfloat *Q, *c_Q;
   randArray(Ntotal, 0., 1., &Q, &c_Q);
 
-  for(int e=0;e<nelem;++e){
-    for(int n=0;n<Np;++n){
-      int idR = n + _R*Np + e*_nstate*Np;
-      int idE = n + _E*Np + e*_nstate*Np;
+  for(int64_t e=0;e<nelem;++e){
+    for(int64_t n=0;n<Np;++n){
+      int64_t idR = n + _R*Np + e*_nstate*Np;
+      int64_t idE = n + _E*Np + e*_nstate*Np;
 
       Q[idR] += 2.;
       Q[idE] += 20.;
@@ -239,16 +239,16 @@ int main(int argc, char **argv){
 
   cudaMemcpy(c_Q, Q, nelem*_nstate*Np*sizeof(dfloat), cudaMemcpyHostToDevice);
 
-  const int Gtotal = Np*nelem*_nvgeo;
+  const int64_t Gtotal = Np*nelem*_nvgeo;
 
   dfloat *vgeo, *c_vgeo;
   randArray(Gtotal, 0, 1., &vgeo, &c_vgeo);
 
   // Make sure the entries of the mass matrix satisfy the inverse relation
-  for(int e=0;e<nelem;++e){
-    for(int n=0;n<Np;++n){
-      int idMJ = n + _MJ*Np + e*_nvgeo*Np;
-      int idMJI = n + _MJI*Np + e*_nvgeo*Np;
+  for(int64_t e=0;e<nelem;++e){
+    for(int64_t n=0;n<Np;++n){
+      int64_t idMJ = n + _MJ*Np + e*_nvgeo*Np;
+      int64_t idMJI = n + _MJI*Np + e*_nvgeo*Np;
 
       vgeo[idMJ] += 3;
       vgeo[idMJI] = 1./vgeo[idMJ];
