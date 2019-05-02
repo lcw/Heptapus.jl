@@ -101,8 +101,6 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
     end
 
     @inbounds @unroll for k in 1:Nq
-        sync_threads()
-
         # Load values will need into registers
         MJ = vgeo[i, j, k, _MJ, e]
         ξx, ξy, ξz = vgeo[i,j,k,_ξx,e], vgeo[i,j,k,_ξy,e], vgeo[i,j,k,_ξz,e]
@@ -134,6 +132,8 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
         fluxV_z = ρinv * W * V
         fluxW_z = ρinv * W * W + P
         fluxE_z = ρinv * W * (E + P)
+
+        sync_threads()
 
         s_F[i, j,  _ρ] = MJ * (ξx * fluxρ_x + ξy * fluxρ_y + ξz * fluxρ_z)
         s_F[i, j,  _U] = MJ * (ξx * fluxU_x + ξy * fluxU_y + ξz * fluxU_z)
