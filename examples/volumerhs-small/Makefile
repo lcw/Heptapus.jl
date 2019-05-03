@@ -12,7 +12,7 @@ OPT := $(SRCDIR)/usr/tools/opt
 CUDA_PATH ?= /usr/lib/cuda
 
 volumerhs: volumerhs.cu | deps.jl
-	$(CLANG) -O3 -L$(CUDA_PATH)/lib64 --cuda-path=$(CUDA_PATH) --cuda-gpu-arch=sm_70 -lcudart -Wl,-rpath=$(CUDA_PATH)/lib64,--enable-new-dtags -o $@ $< 
+	$(CLANG) -Xcuda-ptxas -v -O3 -L$(CUDA_PATH)/lib64 --cuda-path=$(CUDA_PATH) --cuda-gpu-arch=sm_70 -lcudart -Wl,-rpath=$(CUDA_PATH)/lib64,--enable-new-dtags -o $@ $< 
 
 volumerhs.ll: volumerhs.cu | deps.jl
 	$(CLANG) -O3 --cuda-path=$(CUDA_PATH) --cuda-gpu-arch=sm_70 -S -emit-llvm --cuda-device-only -o $@ $< 
