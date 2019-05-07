@@ -1,4 +1,8 @@
 #!/bin/fish
+
+# Script borrowed from
+#   https://github.com/vchuravy/MCAnalyzer.jl/tree/master/contrib
+
 set DIR (dirname (status -f))
 source $DIR/perfenv.sh
 

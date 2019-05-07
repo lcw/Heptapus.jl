@@ -1,4 +1,7 @@
 # fish script that setups an environment suitable to investigate various codegen issues
+#
+# borrowed from
+#   https://github.com/vchuravy/MCAnalyzer.jl/tree/master/contrib
 
 ###
 # Random notes:
