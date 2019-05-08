@@ -12,7 +12,7 @@ function empiricalbandwidth(nbytes=1024^2; devicenumber=0, ntests=10, pinned=fal
     device!(devicenumber)
     stm = CuStream(CUDAdrv.STREAM_NON_BLOCKING)
 
-    d = rand(Char, nbytes)
+    d = rand(Char, nbytes÷sizeof(Char))
     a = pinned ? Mem.alloc(Mem.Host, nbytes) : pointer(d)
     b = Mem.alloc(Mem.Device, nbytes)
 
