@@ -1,4 +1,5 @@
 using CUDAdrv
+using CUDAnative
 
 """
     empiricalbandwidth(nbytes=2*1024^3; devicenumber=0, numtests=10)
@@ -8,9 +9,7 @@ memory.  The device to test can be slected with `devicenumber` and the
 bandwidth is an average of `ntests`.
 """
 function empiricalbandwidth(nbytes=1024^2; devicenumber=0, ntests=10, pinned=false)
-    dev = CuDevice(devicenumber)
-    ctx = CuContext(dev)
-    #stm = CuStream()
+    device!(devicenumber)
     stm = CuStream(CUDAdrv.STREAM_NON_BLOCKING)
 
     d = rand(Char, nbytes)
