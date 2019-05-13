@@ -155,13 +155,13 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
 
         # one shared access per 10 flops
         @unroll for n = 1:Nq
-            Dkn = s_D[k, n]
+            Dnk = s_D[k, n]
 
-            r_rhsρ[n] += Dkn * r_Hρ
-            r_rhsU[n] += Dkn * r_HU
-            r_rhsV[n] += Dkn * r_HV
-            r_rhsW[n] += Dkn * r_HW
-            r_rhsE[n] += Dkn * r_HE
+            r_rhsρ[n] += Dnk * r_Hρ
+            r_rhsU[n] += Dnk * r_HU
+            r_rhsV[n] += Dnk * r_HV
+            r_rhsW[n] += Dnk * r_HW
+            r_rhsE[n] += Dnk * r_HE
         end
 
         r_rhsW[k] -= MJ * ρ * gravity
