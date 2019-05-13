@@ -1,0 +1,10 @@
+==95299== NVPROF is profiling process 95299, command: ./volumerhs
+==95299== Profiling application: ./volumerhs
+==95299== Profiling result:
+   Start  Duration            Grid Size      Block Size     Regs*    SSMem*    DSMem*           Device   Context    Stream  Name
+4.02956s  20.813ms           (4000 1 1)         (5 5 5)       255  7.4219KB        0B  Tesla V100-SXM2         1         7  void volumerhs<long=5, long=125, long=5>(float*, float const *, float const *, float const *, long, float) [413]
+4.05038s  94.179us           (4000 1 1)         (5 5 5)        55  7.4219KB        0B  Tesla V100-SXM2         1         7  void volumerhs_trigpi<long=5, long=125, long=5>(float*, float const *, float const *, float const *, long, float) [421]
+
+Regs: Number of registers used per CUDA thread. This number includes registers used internally by the CUDA driver and/or tools and can be more than what the compiler shows.
+SSMem: Static shared memory allocated per CUDA block.
+DSMem: Dynamic shared memory allocated per CUDA block.
