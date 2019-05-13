@@ -1,0 +1,10 @@
+==97242== NVPROF is profiling process 97242, command: julia --project=/home/jekozdon/codes/CLIMA/env/gpu volumerhs.jl
+==97242== Profiling application: julia --project=/home/jekozdon/codes/CLIMA/env/gpu volumerhs.jl
+==97242== Profiling result:
+   Start  Duration            Grid Size      Block Size     Regs*    SSMem*    DSMem*           Device   Context    Stream  Name
+41.2443s  4.8118ms           (4000 1 1)         (5 5 5)       255  7.4570KB        0B  Tesla V100-SXM2         1         7  ptxcall_volumerhs__5 [122]
+46.4507s  1.2467ms           (4000 1 1)         (5 5 5)       255  7.4570KB        0B  Tesla V100-SXM2         1         7  ptxcall_volumerhs_trigpi__6 [142]
+
+Regs: Number of registers used per CUDA thread. This number includes registers used internally by the CUDA driver and/or tools and can be more than what the compiler shows.
+SSMem: Static shared memory allocated per CUDA block.
+DSMem: Dynamic shared memory allocated per CUDA block.
