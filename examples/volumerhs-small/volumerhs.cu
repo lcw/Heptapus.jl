@@ -147,13 +147,13 @@ template <int64_t Nq, int64_t Np, int64_t nvar>
     // one shared access per 10 flops
 #pragma unroll Nq
     for(int64_t n=0;n<Nq;++n){
-      dfloat  Dkn = s_D[k][n];
+      dfloat  Dnk = s_D[n][k];
 
-      r_rhsR[n] += Dkn * r_HR;
-      r_rhsU[n] += Dkn * r_HU;
-      r_rhsV[n] += Dkn * r_HV;
-      r_rhsW[n] += Dkn * r_HW;
-      r_rhsE[n] += Dkn * r_HE;
+      r_rhsR[n] += Dnk * r_HR;
+      r_rhsU[n] += Dnk * r_HU;
+      r_rhsV[n] += Dnk * r_HV;
+      r_rhsW[n] += Dnk * r_HW;
+      r_rhsE[n] += Dnk * r_HE;
     }
 
     r_rhsW[k] -= MJ * R * gravity;
