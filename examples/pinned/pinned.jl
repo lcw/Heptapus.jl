@@ -1,6 +1,14 @@
 using CUDAdrv
 using CUDAnative
 
+mlock!(p::Ptr, size::Integer) = ccall(:mlock, Cint, (Ptr{Cvoid}, Csize_t), p, size)
+munlock!(p::Ptr, size::Integer) = ccall(:unmlock, Cint, (Ptr{Cvoid}, Csize_t), p, size)
+
+function pin!(a)
+    ad = Mem.register(Mem.Host, pointer(a), sizeof(a))
+    finalizer(_ -> Mem.unregister(ad), a)
+end
+
 """
     empiricalbandwidth(nbytes=2*1024^3; devicenumber=0, numtests=10)
 
@@ -12,24 +20,24 @@ function empiricalbandwidth(nbytes=1024^2; devicenumber=0, ntests=10, pinned=fal
     device!(devicenumber)
     stm = CuStream(CUDAdrv.STREAM_NON_BLOCKING)
 
-    d = rand(Char, nbytes÷sizeof(Char))
-    a = pinned ? Mem.alloc(Mem.Host, nbytes) : pointer(d)
+    a = rand(Char, nbytes÷sizeof(Char))
+    pinned && pin!(a)
+
     b = Mem.alloc(Mem.Device, nbytes)
 
-    Mem.copy!(a, b, nbytes)
-    Mem.copy!(b, a, nbytes)
+    Mem.copy!(pointer(a), b, nbytes)
+    Mem.copy!(b, pointer(a), nbytes)
 
     t_dtoh = CUDAdrv.@elapsed stm for n = 1:ntests
-        Mem.copy!(a, b, nbytes, async=true, stream=stm)
+        Mem.copy!(pointer(a), b, nbytes, async=true, stream=stm)
     end
     bandwidth_dtoh = nbytes*ntests/(t_dtoh*1e9)
 
     t_htod = CUDAdrv.@elapsed stm for n = 1:ntests
-        Mem.copy!(b, a, nbytes, async=true, stream=stm)
+        Mem.copy!(b, pointer(a), nbytes, async=true, stream=stm)
     end
     bandwidth_htod = nbytes*ntests/(t_htod*1e9)
 
-    pinned && Mem.free(a)
     Mem.free(b)
 
     (bandwidth_dtoh, bandwidth_htod)
