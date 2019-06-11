@@ -3,20 +3,26 @@ CuArrays.allowscalar(false)
 import Base.Broadcast: Broadcasted, ArrayStyle
 using LazyArrays
 
-function mycopyto_knl!(dest, bc)
+function mycopyto_knl!(dest, src)
   I = CuArrays.@cuindex dest
-  @inbounds dest[I...] = bc[I...]
+  @inbounds dest[I...] = src[I...]
   nothing
 end
+
+function _mycopyto!(dest, src)
+  dev = CUDAdrv.device()
+  thr = attribute(dev, CUDAdrv.MAX_THREADS_PER_BLOCK)
+  blk = length(dest) ÷ thr + 1
+  @cuda blocks=blk threads=thr mycopyto_knl!(dest, src)
+  return dest
+end
+
+mycopyto!(dest::CuArray, src::CuArray) = _mycopyto!(dest, src)
 
 function mycopyto!(dest, bc::Broadcasted{ArrayStyle{CuArray}})
   axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
   bc′ = Broadcast.preprocess(dest, bc)
-  dev = CUDAdrv.device()
-  thr = attribute(dev, CUDAdrv.MAX_THREADS_PER_BLOCK)
-  blk = length(dest) ÷ thr + 1
-  @cuda blocks=blk threads=thr mycopyto_knl!(dest, bc)
-  return dest
+  _mycopyto!(dest, bc)
 end
 
 a = round.(rand(Float32, (3, 4)) * 100)
@@ -29,3 +35,6 @@ mycopyto!(d_c, @~ d_a .* d_b)
 
 c = a .* b
 c ≈ d_c
+
+mycopyto!(d_c, d_a)
+a ≈ d_c
