@@ -3,26 +3,26 @@ CuArrays.allowscalar(false)
 import Base.Broadcast: Broadcasted, ArrayStyle
 using LazyArrays
 
-function mycopyto_knl!(dest, src)
+function mymap_knl!(f, dest, src)
   I = CuArrays.@cuindex dest
-  @inbounds dest[I...] = src[I...]
+  @inbounds dest[I...] = f(src[I...])
   nothing
 end
 
-function _mycopyto!(dest, src)
+function _mymap!(f, dest, src)
   dev = CUDAdrv.device()
   thr = attribute(dev, CUDAdrv.MAX_THREADS_PER_BLOCK)
   blk = length(dest) ÷ thr + 1
-  @cuda blocks=blk threads=thr mycopyto_knl!(dest, src)
+  @cuda blocks=blk threads=thr mymap_knl!(f, dest, src)
   return dest
 end
 
-mycopyto!(dest::CuArray, src::CuArray) = _mycopyto!(dest, src)
+mymap!(f, dest::CuArray, src::CuArray) = _mymap!(f, dest, src)
 
-function mycopyto!(dest, bc::Broadcasted{ArrayStyle{CuArray}})
+function mymap!(f, dest, bc::Broadcasted{ArrayStyle{CuArray}})
   axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
   bc′ = Broadcast.preprocess(dest, bc)
-  _mycopyto!(dest, bc)
+  _mymap!(f, dest, bc)
 end
 
 a = round.(rand(Float32, (3, 4)) * 100)
@@ -31,10 +31,10 @@ d_a = CuArray(a)
 d_b = CuArray(b)
 d_c = similar(d_a)
 
-mycopyto!(d_c, @~ d_a .* d_b)
+mymap!(identity, d_c, @~ d_a .* d_b)
 
 c = a .* b
 c ≈ d_c
 
-mycopyto!(d_c, d_a)
-a ≈ d_c
+mymap!(x->x^2, d_c, d_a)
+(a.^2) ≈ d_c
