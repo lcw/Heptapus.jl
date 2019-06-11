@@ -9,7 +9,7 @@ function mycopyto_knl!(dest, bc)
   nothing
 end
 
-function mycopyto!(dest, bc::Broadcasted{Nothing})
+function mycopyto!(dest, bc::Broadcasted{ArrayStyle{CuArray}})
   axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
   bc′ = Broadcast.preprocess(dest, bc)
   dev = CUDAdrv.device()
@@ -18,11 +18,6 @@ function mycopyto!(dest, bc::Broadcasted{Nothing})
   @cuda blocks=blk threads=thr mycopyto_knl!(dest, bc)
   return dest
 end
-
-# Base defines this method as a performance optimization, but we don't know how to do
-# `fill!` in general for all `GPUDestArray` so we just go straight to the fallback
-@inline mycopyto!(dest, bc::Broadcasted{ArrayStyle{CuArray}}) =
-    mycopyto!(dest, convert(Broadcasted{Nothing}, bc))
 
 a = round.(rand(Float32, (3, 4)) * 100)
 b = round.(rand(Float32, (1, 4)) * 100)
