@@ -3,38 +3,128 @@ CuArrays.allowscalar(false)
 import Base.Broadcast: Broadcasted, ArrayStyle
 using LazyArrays
 
+# Fast parallel reduction for Kepler hardware
+# - uses shuffle and shared memory to reduce efficiently
+# - support for large arrays
+#
+# Based on devblogs.nvidia.com/parallelforall/faster-parallel-reductions-kepler/
+
+# Reduce a value across a warp
+@inline function reduce_warp(op::F, val::T)::T where {F<:Function,T}
+    offset = CUDAnative.warpsize() ÷ 2
+    # TODO: this can be unrolled if warpsize is known...
+    while offset > 0
+        val = op(val, shfl_down(val, offset))
+        offset ÷= 2
+    end
+    return val
+end
+
+# Reduce a value across a block, using shared memory for communication
+@inline function reduce_block(op::F, val::T)::T where {F<:Function,T}
+    # shared mem for 32 partial sums
+    shared = @cuStaticSharedMem(T, 32)
+
+    wid, lane = fldmod1(threadIdx().x, CUDAnative.warpsize())
+
+    # each warp performs partial reduction
+    val = reduce_warp(op, val)
+
+    # write reduced value to shared memory
+    if lane == 1
+        @inbounds shared[wid] = val
+    end
+
+    # wait for all partial reductions
+    sync_threads()
+
+    # read from shared memory only if that warp existed
+    @inbounds val = (threadIdx().x <= fld(blockDim().x, CUDAnative.warpsize())) ? shared[lane] : zero(T)
+
+    # final reduce within first warp
+    if wid == 1
+        val = reduce_warp(op, val)
+    end
+
+    return val
+end
+
+# Reduce an array across a complete grid
+function reduce_grid(op::F, input::CuDeviceVector{T}, output::CuDeviceVector{T},
+                     len::Integer) where {F<:Function,T}
+    # TODO: neutral element depends on the operator (see Base's 2 and 3 argument `reduce`)
+    val = zero(T)
+
+    # reduce multiple elements per thread (grid-stride loop)
+    # TODO: step range (see JuliaGPU/CUDAnative.jl#12)
+    i = (blockIdx().x-1) * blockDim().x + threadIdx().x
+    step = blockDim().x * gridDim().x
+    while i <= len
+        @inbounds val = op(val, input[i])
+        i += step
+    end
+
+    val = reduce_block(op, val)
+
+    if threadIdx().x == 1
+        @inbounds output[blockIdx().x] = val
+    end
+
+    return
+end
+
+"""
+Reduce a large array.
+
+Kepler-specific implementation, ie. you need sm_30 or higher to run this code.
+"""
+function gpu_reduce(op::Function, input::CuArray{T}, output::CuArray{T}) where {T}
+    if capability(device()) < v"3.0"
+        @warn("this example requires a newer GPU")
+        exit(0)
+    end
+
+    len = length(input)
+
+    # TODO: these values are hardware-dependent, with recent GPUs supporting more threads
+    threads = 512
+    blocks = min((len + threads - 1) ÷ threads, 1024)
+
+    # the output array must have a size equal to or larger than the number of thread blocks
+    # in the grid because each block writes to a unique location within the array.
+    if length(output) < blocks
+        throw(ArgumentError("output array too small, should be at least $blocks elements"))
+    end
+
+    @cuda blocks=blocks threads=threads reduce_grid(op, input, output, len)
+    @cuda threads=1024 reduce_grid(op, output, output, blocks)
+end
+
+# FURTHER IMPROVEMENTS:
+# - use atomic memory operations
+# - dynamic block/grid size based on device capabilities
+# - vectorized memory access
+#   devblogs.nvidia.com/parallelforall/cuda-pro-tip-increase-performance-with-vectorized-memory-access/
+
+
 function mymap_knl!(f, dest, src)
-  I = CuArrays.@cuindex dest
-  @inbounds dest[I...] = f(src[I...])
-  nothing
+    I = CuArrays.@cuindex dest
+    @inbounds dest[I...] = f(src[I...])
+    nothing
 end
 
 function _mymap!(f, dest, src)
-  dev = CUDAdrv.device()
-  thr = attribute(dev, CUDAdrv.MAX_THREADS_PER_BLOCK)
-  blk = length(dest) ÷ thr + 1
-  @cuda blocks=blk threads=thr mymap_knl!(f, dest, src)
-  return dest
+    dev = CUDAdrv.device()
+    thr = attribute(dev, CUDAdrv.MAX_THREADS_PER_BLOCK)
+    blk = length(dest) ÷ thr + 1
+    @cuda blocks=blk threads=thr mymap_knl!(f, dest, src)
+    return dest
 end
 
 mymap!(f, dest::CuArray, src::CuArray) = _mymap!(f, dest, src)
 
 function mymap!(f, dest, bc::Broadcasted{ArrayStyle{CuArray}})
-  axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
-  bc′ = Broadcast.preprocess(dest, bc)
-  _mymap!(f, dest, bc)
+    axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
+    bc′ = Broadcast.preprocess(dest, bc)
+    _mymap!(f, dest, bc)
 end
-
-a = round.(rand(Float32, (3, 4)) * 100)
-b = round.(rand(Float32, (1, 4)) * 100)
-d_a = CuArray(a)
-d_b = CuArray(b)
-d_c = similar(d_a)
-
-mymap!(identity, d_c, @~ d_a .* d_b)
-
-c = a .* b
-c ≈ d_c
-
-mymap!(x->x^2, d_c, d_a)
-(a.^2) ≈ d_c
