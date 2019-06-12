@@ -20,7 +20,10 @@ end
 
 # Reduce a value across a block, using shared memory for communication
 @inline function reduce_block(op::F, val::T)::T where {F<:Function,T}
-    # shared mem for 32 partial sums
+    # shared mem for partial sums
+    #
+    # TODO the size should be based on number of threads per block divided by
+    # the warpsize.
     shared = @cuStaticSharedMem(T, 32)
 
     wid, lane = fldmod1(threadIdx().x, CUDAnative.warpsize())
