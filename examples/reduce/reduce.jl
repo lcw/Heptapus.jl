@@ -48,7 +48,10 @@ end
 end
 
 # Reduce an array across a complete grid
-function reduce_grid(op::F, input::CuDeviceVector{T}, output::CuDeviceVector{T},
+function reduce_grid(op::F,
+                     input::Union{Broadcasted{ArrayStyle{CuArray}},
+                                  CuDeviceArray{T}},
+                     output::CuDeviceArray{T},
                      len::Integer) where {F<:Function,T}
     # TODO: neutral element depends on the operator (see Base's 2 and 3 argument `reduce`)
     val = zero(T)
@@ -58,7 +61,8 @@ function reduce_grid(op::F, input::CuDeviceVector{T}, output::CuDeviceVector{T},
     i = (blockIdx().x-1) * blockDim().x + threadIdx().x
     step = blockDim().x * gridDim().x
     while i <= len
-        @inbounds val = op(val, input[i])
+        I = Tuple(CartesianIndices(axes(input))[i])
+        @inbounds val = op(val, input[I...])
         i += step
     end
 
@@ -76,7 +80,7 @@ Reduce a large array.
 
 Kepler-specific implementation, ie. you need sm_30 or higher to run this code.
 """
-function gpu_reduce(op::Function, input::CuArray{T}, output::CuArray{T}) where {T}
+function gpu_reduce(op::Function, input, output::CuArray{T}) where {T}
     if capability(device()) < v"3.0"
         @warn("this example requires a newer GPU")
         exit(0)
