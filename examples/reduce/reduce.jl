@@ -57,13 +57,11 @@ function reduce_grid(op::F,
     val = zero(T)
 
     # reduce multiple elements per thread (grid-stride loop)
-    # TODO: step range (see JuliaGPU/CUDAnative.jl#12)
-    i = (blockIdx().x-1) * blockDim().x + threadIdx().x
+    start = (blockIdx().x-1) * blockDim().x + threadIdx().x
     step = blockDim().x * gridDim().x
-    while i <= len
+    for i = start:step:len
         I = Tuple(CartesianIndices(axes(input))[i])
         @inbounds val = op(val, input[I...])
-        i += step
     end
 
     val = reduce_block(op, val)
