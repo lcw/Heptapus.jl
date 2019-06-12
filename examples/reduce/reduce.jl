@@ -105,26 +105,3 @@ end
 # - dynamic block/grid size based on device capabilities
 # - vectorized memory access
 #   devblogs.nvidia.com/parallelforall/cuda-pro-tip-increase-performance-with-vectorized-memory-access/
-
-
-function mymap_knl!(f, dest, src)
-    I = CuArrays.@cuindex dest
-    @inbounds dest[I...] = f(src[I...])
-    nothing
-end
-
-function _mymap!(f, dest, src)
-    dev = CUDAdrv.device()
-    thr = attribute(dev, CUDAdrv.MAX_THREADS_PER_BLOCK)
-    blk = length(dest) ÷ thr + 1
-    @cuda blocks=blk threads=thr mymap_knl!(f, dest, src)
-    return dest
-end
-
-mymap!(f, dest::CuArray, src::CuArray) = _mymap!(f, dest, src)
-
-function mymap!(f, dest, bc::Broadcasted{ArrayStyle{CuArray}})
-    axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
-    bc′ = Broadcast.preprocess(dest, bc)
-    _mymap!(f, dest, bc)
-end
