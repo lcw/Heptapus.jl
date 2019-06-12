@@ -1,7 +1,5 @@
-using CUDAdrv, CuArrays, CUDAnative, GPUArrays
-CuArrays.allowscalar(false)
+using CUDAdrv, CuArrays, CUDAnative
 import Base.Broadcast: Broadcasted, ArrayStyle
-using LazyArrays
 
 # Fast parallel reduction for Kepler hardware
 # - uses shuffle and shared memory to reduce efficiently
