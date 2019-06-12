@@ -8,18 +8,20 @@ import Base.Broadcast: Broadcasted, ArrayStyle
 # Based on devblogs.nvidia.com/parallelforall/faster-parallel-reductions-kepler/
 
 # Reduce a value across a warp
-@inline function reduce_warp(op::F, val::T)::T where {F<:Function,T}
+@inline function reduce_warp(op::F, val::T, threadmask::UInt32)::T where {F<:Function,T}
     offset = CUDAnative.warpsize() ÷ 2
     # TODO: this can be unrolled if warpsize is known...
     while offset > 0
-        val = op(val, shfl_down(val, offset))
+        # TODO: uncomment when working
+        # val = op(val, shfl_down_sync(val, offset, 32, threadmask))
+        val = op(val, shfl_down_sync(val, offset, 32))
         offset ÷= 2
     end
     return val
 end
 
 # Reduce a value across a block, using shared memory for communication
-@inline function reduce_block(op::F, val::T)::T where {F<:Function,T}
+@inline function reduce_block(op::F, val::T, useval::Bool)::T where {F<:Function,T}
     # shared mem for partial sums
     #
     # TODO the size should be based on number of threads per block divided by
@@ -29,7 +31,11 @@ end
     wid, lane = fldmod1(threadIdx().x, CUDAnative.warpsize())
 
     # each warp performs partial reduction
-    val = reduce_warp(op, val)
+    threadmask = vote_ballot(useval)
+    # if useval
+    if true
+        val = reduce_warp(op, val, threadmask)
+    end
 
     # write reduced value to shared memory
     if lane == 1
@@ -39,12 +45,15 @@ end
     # wait for all partial reductions
     sync_threads()
 
-    # read from shared memory only if that warp existed
-    @inbounds val = (threadIdx().x <= fld1(blockDim().x, CUDAnative.warpsize())) ? shared[lane] : zero(T)
-
     # final reduce within first warp
     if wid == 1
-        val = reduce_warp(op, val)
+        warpexisted = threadIdx().x <= fld1(blockDim().x, CUDAnative.warpsize())
+        @inbounds val = warpexisted ? shared[lane] : zero(T)
+        threadmask = vote_ballot(warpexisted)
+        # if warpexisted
+        if true
+            val = reduce_warp(op, val, threadmask)
+        end
     end
 
     return val
@@ -56,7 +65,6 @@ function reduce_grid(op::F,
                                   CuDeviceArray{T}},
                      output::CuDeviceArray{T},
                      len::Integer) where {F<:Function,T}
-    # TODO: neutral element depends on the operator (see Base's 2 and 3 argument `reduce`)
     val = zero(T)
 
     # reduce multiple elements per thread (grid-stride loop)
@@ -67,7 +75,7 @@ function reduce_grid(op::F,
         @inbounds val = op(val, input[I...])
     end
 
-    val = reduce_block(op, val)
+    val = reduce_block(op, val, start <= len)
 
     if threadIdx().x == 1
         @inbounds output[blockIdx().x] = val
