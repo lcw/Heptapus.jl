@@ -1,0 +1,3 @@
+[deps]
+CUDAnative = "be33ccc6-a3ff-5ff2-a52e-74243cff1e17"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
