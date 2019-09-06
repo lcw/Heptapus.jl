@@ -1,9 +1,8 @@
-using LinearAlgebra, GPUifyLoops, StaticArrays, StructArrays, Random
+using LinearAlgebra, GPUifyLoops, StaticArrays, Random, Test
 
 @static if Base.find_package("CuArrays") !== nothing
     using CuArrays, CUDAnative
 end
-
 
 Random.seed!(4)
 
@@ -49,32 +48,14 @@ Implementation of the 2 x 2 eignvalue and eigenvector solver found in:
 end
 
 # initialize with random symmetric matrices
-N = 5
+N = 2^25
 T = Float64
 
-SH = SHermitianCompact{2, T, 3}
-As = StructArray{SH}(undef, N, unwrap = t -> t <: Union{SVector,Tuple})
-for i = 1:N
-    As[i] = SHermitianCompact(@SVector(rand(3)))
-end
-
-SM = SMatrix{2, 2, T, 4}
-Vs = StructArray{SM}(undef, N, unwrap = t -> t <: Union{NTuple})
-
-SV = SVector{2, T}
-λs = StructArray{SV}(undef, N, unwrap = t -> t <: Union{NTuple})
+As = (rand(T, N), rand(T, N), rand(T, N))
+Vs = ntuple(_->similar(As[1]), 4)
+λs = ntuple(_->similar(As[1]), 2)
 
 function kernel(As, Vs, λs)
-    @inbounds @loop for i in (1:size(As,1);
-                              (blockIdx().x-1)*blockDim().x + threadIdx().x)
-        F = cfbeigen(As[i])
-        Vs[i] = F.vectors
-        λs[i] = F.values
-    end
-    nothing
-end
-
-function arrayskernel(As, Vs, λs)
     @inbounds @loop for i in (1:size(As[1],1);
                               (blockIdx().x-1)*blockDim().x + threadIdx().x)
         A = SHermitianCompact(@SVector([As[1][i], As[2][i], As[3][i]]))
@@ -94,20 +75,24 @@ end
 
 @launch CPU() kernel(As, Vs, λs)
 
-display(As)
-display(Vs)
-display(λs)
-
 @static if Base.find_package("CuArrays") !== nothing
-    cAs = CuArray.(fieldarrays(As.lowertriangle.data))
-    cVs = similar.(CuArray.(fieldarrays(Vs.data)))
-    cλs = similar.(CuArray.(fieldarrays(λs.data)))
+    cAs = CuArray.(As)
+    cVs = ntuple(_->similar(cAs[1]), length(Vs))
+    cλs = ntuple(_->similar(cAs[1]), length(λs))
 
     threads = 1024
     blocks = cld(size(cAs[1],1), threads)
-    @launch(CUDA(), threads=threads, blocks=blocks, arrayskernel(cAs, cVs, cλs))
+    @launch(CUDA(), threads=threads, blocks=blocks, kernel(cAs, cVs, cλs))
 
-    display(cAs)
-    display(cVs)
-    display(cλs)
+    for j = 1:length(As)
+      @test As[j] ≈ Array(cAs[j])
+    end
+
+    for j = 1:length(Vs)
+      @test Vs[j] ≈ Array(cVs[j])
+    end
+
+    for j = 1:length(λs)
+      @test λs[j] ≈ Array(cλs[j])
+    end
 end

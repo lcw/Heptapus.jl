@@ -2,4 +2,3 @@
 GPUifyLoops = "ba82f77b-6841-5d2e-bd9f-4daf811aec27"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
