@@ -74,17 +74,40 @@ function kernel(As, Vs, λs)
     nothing
 end
 
-@launch CPU() kernel(As, Vs, λs)
+function arrayskernel(As, Vs, λs)
+    @inbounds @loop for i in (1:size(As[1],1);
+                              (blockIdx().x-1)*blockDim().x + threadIdx().x)
+        A = SHermitianCompact(@SVector([As[1][i], As[2][i], As[3][i]]))
 
-@static if Base.find_package("CuArrays") !== nothing
-    threads = 1024
-    blocks = cld(size(As,1),threads)
-    replace_storage(CuArray, As)
-    replace_storage(CuArray, Vs)
-    replace_storage(CuArray, λs)
-    @launch(CUDA(), threads=threads, blocks=blocks, kernel(As, Vs, λs))
+        F = cfbeigen(A)
+
+        @unroll for j = 1:length(F.vectors)
+            Vs[j][i] = F.vectors[j]
+        end
+
+        @unroll for j = 1:length(F.values)
+            λs[j][i] = F.values[j]
+        end
+    end
+    nothing
 end
 
-@show As
-@show Vs
-@show λs
+@launch CPU() kernel(As, Vs, λs)
+
+display(As)
+display(Vs)
+display(λs)
+
+@static if Base.find_package("CuArrays") !== nothing
+    cAs = CuArray.(fieldarrays(As.lowertriangle.data))
+    cVs = similar.(CuArray.(fieldarrays(Vs.data)))
+    cλs = similar.(CuArray.(fieldarrays(λs.data)))
+
+    threads = 1024
+    blocks = cld(size(cAs[1],1), threads)
+    @launch(CUDA(), threads=threads, blocks=blocks, arrayskernel(cAs, cVs, cλs))
+
+    display(cAs)
+    display(cVs)
+    display(cλs)
+end
