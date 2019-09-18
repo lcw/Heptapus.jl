@@ -15,8 +15,7 @@ de = similar(dd)
 function kernel!(dest, src)
   i = (blockIdx().x-1)*blockDim().x + threadIdx().x
   if i <= length(dest)
-    dest[i].a = src[i].a
-    dest[i].b = src[i].b
+    dest[i] = src[i]
   end
   return nothing
 end
