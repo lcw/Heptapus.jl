@@ -13,22 +13,21 @@ function sstuple(::Type{NT}) where {NT<:NamedTuple}
     _map_params(x->sstuple(staticschema(x)), NT)
 end
 
-function f(s, es, exprs)
+function _getcolproperties!(exprs, s, es=[])
     if typeof(s) <: Symbol
         push!(exprs, es)
         return
     end
     for key in keys(s)
-        f(getproperty(s,key), vcat(es, key), exprs)
+        _getcolproperties!(exprs, getproperty(s,key), vcat(es, key))
     end
 end
 
 using StaticArrays
 c = [(a=SHermitianCompact(@SVector(rand(3))), b=(@SVector(rand(2)))) for i=1:5]
 d = d = StructArray(c, unwrap = t -> t <: Union{SHermitianCompact,SVector,Tuple})
-a = []
 b = []
 S = StructArrays.staticschema(typeof(d))
 s = sstuple(S)
-f(s, a, b)
+_getcolproperties!(b, s)
 @show b

@@ -1,7 +1,5 @@
 using CUDAnative, CuArrays, StaticArrays, StructArrays
 
-CUDAnative.cudaconvert(s::StructArray) = replace_storage(cudaconvert, s)
-
 # c = [(a=SHermitianCompact(@SVector(rand(3))), b=(@SVector(rand(2)))) for i=1:5]
 
 c = [SHermitianCompact(@SVector(rand(3))) for i=1:5]
