@@ -1,4 +1,5 @@
-using BandedMatrices, LinearAlgebra
+using BandedMatrices, LinearAlgebra, UnicodePlots
+
 using CuArrays
 using CuArrays.CUSPARSE
 using CuArrays.CUSOLVER
@@ -45,4 +46,24 @@ let
 
 end
 
+let
 
+  N = 5
+  Nq = N + 1
+  Nfields = 5
+  Ne_vert = 8
+  Ne_horz = 6*6*6
+
+  b = rand(Nq, Nq, Nq, Nfields, Ne_vert, Ne_horz)
+
+  m = n = Nq * Nfields * Ne_vert
+  p = q = Nq * Nfields
+
+  A = Array(brand(Float64, m, n, p, q))
+  F = lu(A, Val(false))
+
+  display(spy(A))
+  display(spy(F.L))
+  display(spy(F.U))
+
+end
