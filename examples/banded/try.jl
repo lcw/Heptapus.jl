@@ -2,20 +2,63 @@ using BandedMatrices, LinearAlgebra, UnicodePlots
 using GPUifyLoops, CUDAnative, CuArrays
 using Test
 
-function forward!(A, B)
-    @inbounds @loop for i in (1:size(A,1);
-                              (blockIdx().x-1)*blockDim().x + threadIdx().x)
-        A[i] = B[i]
+function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+  n = Nfields * Nq * Ne_vert
+  p = Nfields * Nq
+  q = 0
+
+  @loop for h in (1:Ne_horz; blockIdx().x)
+    @loop for i in (1:Nq; threadIdx().x)
+      @loop for j in (1:Nq; threadIdx().y)
+        for v = 1:Ne_vert
+          for k = 1:Nq
+            for f = 1:Nfields
+              jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
+
+              for ii = (jj + 1):min(jj + p, n)
+                (idx, fi) = fldmod1(ii, Nfields)
+                (vi, ki) = fldmod1(idx, Nq)
+
+                b[i, j, ki, fi, vi, h] -= L[q + ii - jj + 1, jj] * b[i, j, k, f, v, h]
+              end
+            end
+          end
+        end
+      end
     end
-    nothing
+  end
+
+  nothing
 end
 
-function backward!(A, B)
-    @inbounds @loop for i in (1:size(A,1);
-                              (blockIdx().x-1)*blockDim().x + threadIdx().x)
-        A[i] = B[i]
+function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+  n = Nfields * Nq * Ne_vert
+  q = Nfields * Nq
+
+  @loop for h in (1:Ne_horz; blockIdx().x)
+    @loop for i in (1:Nq; threadIdx().x)
+      @loop for j in (1:Nq; threadIdx().y)
+        for v = 1:Ne_vert
+          for k = 1:Nq
+            for f = 1:Nfields
+              jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
+
+              b[i, j, k, f, v, h] /= U[q + 1, jj]
+
+              for ii = max(1, jj - q):(jj - 1)
+                (idx, fi) = fldmod1(ii, Nfields)
+                (vi, ki) = fldmod1(idx, Nq)
+
+                b[i, j, ki, fi, vi, h] -= U[q + ii - jj + 1, jj] * b[i, j, k, f, v, h]
+              end
+            end
+          end
+        end
+      end
     end
-    nothing
+  end
+
+  nothing
 end
 
 function extract_banded!(B::AbstractMatrix, A::AbstractMatrix, p, q)
@@ -42,7 +85,7 @@ let
   Nfields = 5
   Ne_vert = 8
   Ne_horz = 6*6*6
-  FT = Float32
+  FT = Float64
 
   m = n = Nq * Nfields * Ne_vert
   p = q = Nq * Nfields
@@ -58,6 +101,7 @@ let
   U = extract_banded(F.U, 0, q)
 
   b = rand(FT, Nq, Nq, Nq, Nfields, Ne_vert, Ne_horz)
+  borig = copy(b)
   x = similar(b)
   fill!(x, NaN)
 
@@ -67,8 +111,18 @@ let
   bp = reshape(PermutedDimsArray(b, perm), Nfields*Nq*Ne_vert, Nq*Nq*Ne_horz)
   xp .= F \ bp
 
-  # threads = 1024
-  # blocks = ceil(Int, size(A,1)/threads)
-  # @launch(CUDA(), threads=threads, blocks=blocks, kernel!(A, B))
+  # Move data to the GPU
+  d_L = CuArray(L)
+  d_U = CuArray(U)
+  d_b = CuArray(b)
 
+  threads = (Nq, Nq)
+  blocks = Ne_horz
+  @launch(CPU(), threads=threads, blocks=blocks, forward!(b, L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(CPU(), threads=threads, blocks=blocks, backward!(b, U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+
+  @launch(CUDA(), threads=threads, blocks=blocks, forward!(d_b, d_L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(CUDA(), threads=threads, blocks=blocks, backward!(d_b, d_U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+
+  x ≈ Array(d_b)
 end
