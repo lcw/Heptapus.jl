@@ -1,6 +1,16 @@
 using BandedMatrices, LinearAlgebra, UnicodePlots
-using GPUifyLoops, CUDAnative, CuArrays
+using GPUifyLoops
 using Test
+
+using CUDAapi # this will NEVER fail
+if has_cuda()
+  try
+    using CUDAnative, CuArrays
+  catch ex
+    # something is wrong with the user's set-up (or there's a bug in CuArrays)
+    @warn "CUDA is installed, but CuArrays.jl fails to load" exception=(ex,catch_backtrace())
+  end
+end
 
 function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
   n = Nfields * Nq * Ne_vert
@@ -112,17 +122,20 @@ let
   xp .= F \ bp
 
   # Move data to the GPU
-  d_L = CuArray(L)
-  d_U = CuArray(U)
-  d_b = CuArray(b)
+  DefaultArray = has_cuda() ? CuArray : Array
+  device = has_cuda() ? CUDA() : CPU()
+
+  d_L = DefaultArray(L)
+  d_U = DefaultArray(U)
+  d_b = DefaultArray(b)
 
   threads = (Nq, Nq)
   blocks = Ne_horz
   @launch(CPU(), threads=threads, blocks=blocks, forward!(b, L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
   @launch(CPU(), threads=threads, blocks=blocks, backward!(b, U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
 
-  @launch(CUDA(), threads=threads, blocks=blocks, forward!(d_b, d_L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
-  @launch(CUDA(), threads=threads, blocks=blocks, backward!(d_b, d_U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(device, threads=threads, blocks=blocks, forward!(d_b, d_L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(device, threads=threads, blocks=blocks, backward!(d_b, d_U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
 
   x ≈ Array(d_b)
 end
