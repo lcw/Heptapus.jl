@@ -71,6 +71,23 @@ function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_hor
   nothing
 end
 
+function band_forward!(b, L, p)
+  n = size(b, 1)
+  for j = 1:n, i = (j+1):min(j+p, n)
+    b[i] -= L[i, j]*b[j]
+  end
+end
+
+function band_backward!(b, U, q)
+  n = size(b, 1)
+  for j = n:-1:1
+    b[j] /= U[j, j]
+    for i = max(1,j-q):(j-1)
+      b[i] -= U[i, j]*b[j]
+    end
+  end
+end
+
 function extract_banded!(B::AbstractMatrix, A::AbstractMatrix, p, q)
   @assert p ≥ 0
   @assert q ≥ 0
@@ -86,6 +103,27 @@ end
 
 function extract_banded(A::AbstractMatrix, p, q)
   extract_banded!(similar(A, p + q + 1, size(A, 2)), A, p, q)
+end
+
+let
+
+  T = Float64
+  A = T[2 1 0
+       1 2 1
+       0 1 2]
+  F = lu(A, Val(false))
+
+  m = n = size(A, 1)
+  p = q = 1
+
+  b = T[4;8;8]
+
+  A\b
+
+  bb = copy(b)
+  band_forward!(bb, F.L, p)
+  band_backward!(bb, F.U, q)
+
 end
 
 let
