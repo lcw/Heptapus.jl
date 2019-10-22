@@ -48,9 +48,9 @@ function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_hor
   @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for i in (1:Nq; threadIdx().x)
       @loop for j in (1:Nq; threadIdx().y)
-        for v = 1:Ne_vert
-          for k = 1:Nq
-            for f = 1:Nfields
+        for v = Ne_vert:-1:1
+          for k = Nq:-1:1
+            for f = Nfields:-1:1
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
               b[i, j, k, f, v, h] /= U[q + 1, jj]
@@ -131,11 +131,14 @@ let
 
   threads = (Nq, Nq)
   blocks = Ne_horz
+
   @launch(CPU(), threads=threads, blocks=blocks, forward!(b, L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
   @launch(CPU(), threads=threads, blocks=blocks, backward!(b, U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+
+  @test x ≈ Array(b)
 
   @launch(device, threads=threads, blocks=blocks, forward!(d_b, d_L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
   @launch(device, threads=threads, blocks=blocks, backward!(d_b, d_U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
 
-  x ≈ Array(d_b)
+  @test x ≈ Array(d_b)
 end
