@@ -12,7 +12,8 @@ if has_cuda()
   end
 end
 
-function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
+                  ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
   FT = eltype(b)
   n = Nfields * Nq * Ne_vert
   p = Nfields * Nq
@@ -60,7 +61,8 @@ function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_horz
   nothing
 end
 
-function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
+                   ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
   n = Nfields * Nq * Ne_vert
   q = Nfields * Nq
 
