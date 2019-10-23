@@ -18,9 +18,9 @@ function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
   n = Nfields * Nq * Ne_vert
   p = Nfields * Nq
 
-  l_b = MArray{Tuple{Nfields*Nq+1}, FT}(undef)
+  l_b = MArray{Tuple{p+1}, FT}(undef)
 
-  @loop for h in (1:Ne_horz; blockIdx().x)
+  @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for i in (1:Nq; threadIdx().x)
       @loop for j in (1:Nq; threadIdx().y)
         @unroll for k = 1:Nq
@@ -36,20 +36,20 @@ function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
             @unroll for f = 1:Nfields
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
-              @unroll for ii = 1:p
-                l_b[ii + 1] -= L[ii + 1, jj] * l_b[1]
+              @unroll for ii = 2:p+1
+                l_b[ii] -= L[ii, jj] * l_b[1]
               end
 
               b[i, j, k, f, v, h] = l_b[1]
 
               @unroll for ii = 1:p
-                l_b[ii] = l_b[ii+1]
+                l_b[ii] = l_b[ii + 1]
               end
 
-              if jj + p + 1 ≤ n
+              if jj + p < n
                 (idx, fi) = fldmod1(jj + p + 1, Nfields)
                 (vi, ki) = fldmod1(idx, Nq)
-                l_b[p+1] = b[i, j, ki, fi, vi, h]
+                l_b[p + 1] = b[i, j, ki, fi, vi, h]
               end
             end
           end
@@ -63,24 +63,46 @@ end
 
 function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
                    ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+  FT = eltype(b)
   n = Nfields * Nq * Ne_vert
   q = Nfields * Nq
 
-  @loop for h in (1:Ne_horz; blockIdx().x)
+  l_b = MArray{Tuple{q+1}, FT}(undef)
+
+  @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for i in (1:Nq; threadIdx().x)
       @loop for j in (1:Nq; threadIdx().y)
-        for v = Ne_vert:-1:1
-          for k = Nq:-1:1
-            for f = Nfields:-1:1
+        @unroll for k = Nq:-1:1
+          @unroll for f = Nfields:-1:1
+            ii  = f + (k - 1) * Nfields
+            l_b[ii+1] =  b[i, j, k, f, Ne_vert, h]
+          end
+        end
+        l_b[1] = Ne_vert > 1 ? b[i, j, Nq, Nfields, Ne_vert-1, h] : zero(FT)
+
+
+        @unroll for v = Ne_vert:-1:1
+          @unroll for k = Nq:-1:1
+            @unroll for f = Nfields:-1:1
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
-              b[i, j, k, f, v, h] /= U[q + 1, jj]
+              l_b[q + 1] /= U[q + 1, jj]
 
-              for ii = max(1, jj - q):(jj - 1)
-                (idx, fi) = fldmod1(ii, Nfields)
+              b[i, j, k, f, v, h] = l_b[q + 1]
+
+              @unroll for ii = 1:q
+                l_b[ii] -= U[ii, jj] * l_b[q + 1]
+              end
+
+              @unroll for ii = q:-1:1
+                l_b[ii+1] = l_b[ii]
+              end
+
+              if jj - q  > 1
+                (idx, fi) = fldmod1(jj - q - 1, Nfields)
                 (vi, ki) = fldmod1(idx, Nq)
 
-                b[i, j, ki, fi, vi, h] -= U[q + ii - jj + 1, jj] * b[i, j, k, f, v, h]
+                l_b[1] = b[i, j, ki, fi, vi, h]
               end
             end
           end
