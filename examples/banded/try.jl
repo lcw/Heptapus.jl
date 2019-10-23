@@ -1,5 +1,5 @@
 using BandedMatrices, LinearAlgebra, UnicodePlots
-using GPUifyLoops
+using GPUifyLoops, StaticArrays
 using Test
 
 using CUDAapi # this will NEVER fail
@@ -13,23 +13,42 @@ if has_cuda()
 end
 
 function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert}, ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+  FT = eltype(b)
   n = Nfields * Nq * Ne_vert
   p = Nfields * Nq
-  q = 0
+
+  l_b = MArray{Tuple{Nfields*Nq+1}, FT}(undef)
 
   @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for i in (1:Nq; threadIdx().x)
       @loop for j in (1:Nq; threadIdx().y)
-        for v = 1:Ne_vert
-          for k = 1:Nq
-            for f = 1:Nfields
+        @unroll for k = 1:Nq
+          @unroll for f = 1:Nfields
+            ii  = f + (k - 1) * Nfields
+            l_b[ii] =  b[i, j, k, f, 1, h]
+          end
+        end
+        l_b[p+1] = Ne_vert > 1 ? b[i, j, 1, 1, 2, h] : zero(FT)
+
+        @unroll for v = 1:Ne_vert
+          @unroll for k = 1:Nq
+            @unroll for f = 1:Nfields
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
-              for ii = (jj + 1):min(jj + p, n)
-                (idx, fi) = fldmod1(ii, Nfields)
-                (vi, ki) = fldmod1(idx, Nq)
+              @unroll for ii = 1:p
+                l_b[ii + 1] -= L[ii + 1, jj] * l_b[1]
+              end
 
-                b[i, j, ki, fi, vi, h] -= L[q + ii - jj + 1, jj] * b[i, j, k, f, v, h]
+              b[i, j, k, f, v, h] = l_b[1]
+
+              @unroll for ii = 1:p
+                l_b[ii] = l_b[ii+1]
+              end
+
+              if jj + p + 1 ≤ n
+                (idx, fi) = fldmod1(jj + p + 1, Nfields)
+                (vi, ki) = fldmod1(idx, Nq)
+                l_b[p+1] = b[i, j, ki, fi, vi, h]
               end
             end
           end
