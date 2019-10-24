@@ -21,8 +21,8 @@ function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
   l_b = MArray{Tuple{p+1}, FT}(undef)
 
   @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
-    @loop for i in (1:Nq; threadIdx().x)
-      @loop for j in (1:Nq; threadIdx().y)
+    @loop for j in (1:Nq; threadIdx().y)
+      @loop for i in (1:Nq; threadIdx().x)
         @unroll for k = 1:Nq
           @unroll for f = 1:Nfields
             ii  = f + (k - 1) * Nfields
@@ -31,7 +31,7 @@ function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
         end
         l_b[p+1] = Ne_vert > 1 ? b[i, j, 1, 1, 2, h] : zero(FT)
 
-        @unroll for v = 1:Ne_vert
+        for v = 1:Ne_vert
           @unroll for k = 1:Nq
             @unroll for f = 1:Nfields
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
@@ -46,11 +46,18 @@ function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
                 l_b[ii] = l_b[ii + 1]
               end
 
-              if jj + p < n
-                (idx, fi) = fldmod1(jj + p + 1, Nfields)
-                (vi, ki) = fldmod1(idx, Nq)
-                l_b[p + 1] = b[i, j, ki, fi, vi, h]
-              end
+              ki = 1
+              fi = 1
+              vi = 1
+              idx = jj + p
+              # if idx < n
+                 fi = (idx % Nfields) + 1
+                 idx = idx ÷ Nfields
+                 ki = (idx % Nq) + 1
+                 vi = (idx ÷ Nq) + 1
+              # end
+              # Note: read out of bounds to avoid local load and stores
+              l_b[p + 1] = b[i, j, ki, fi, vi, h]
             end
           end
         end
@@ -70,10 +77,10 @@ function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
   l_b = MArray{Tuple{q+1}, FT}(undef)
 
   @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
-    @loop for i in (1:Nq; threadIdx().x)
-      @loop for j in (1:Nq; threadIdx().y)
-        @unroll for k = Nq:-1:1
-          @unroll for f = Nfields:-1:1
+    @loop for j in (1:Nq; threadIdx().y)
+      @loop for i in (1:Nq; threadIdx().x)
+        for k = Nq:-1:1
+          for f = Nfields:-1:1
             ii  = f + (k - 1) * Nfields
             l_b[ii+1] =  b[i, j, k, f, Ne_vert, h]
           end
@@ -173,9 +180,15 @@ let
 
   N = 5
   Nq = N + 1
-  Nfields = 5
-  Ne_vert = 8
-  Ne_horz = 6*6*6
+  # H-S
+  # Nfields = 5
+  # Ne_vert = 8
+  # Ne_horz = 6*6*6
+
+  # Dycoms
+  Nfields = 6
+  Ne_vert = 60
+  Ne_horz = 22*22
   FT = Float64
 
   m = n = Nq * Nfields * Ne_vert
