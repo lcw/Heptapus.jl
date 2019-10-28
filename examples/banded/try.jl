@@ -12,8 +12,8 @@ if has_cuda()
   end
 end
 
-function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
-                  ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+function forward!(b, L::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
+                  ::Val{Ne_horz}) where {T, N, Nq, Nfields, Ne_vert, Ne_horz}
   FT = eltype(b)
   n = Nfields * Nq * Ne_vert
   p = Nfields * Nq
@@ -37,7 +37,11 @@ function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
               @unroll for ii = 2:p+1
-                l_b[ii] -= L[ii, jj] * l_b[1]
+                if N == 2
+                  l_b[ii] -= L[ii, jj] * l_b[1]
+                else
+                  l_b[ii] -= L[i, j, ii, jj, h] * l_b[1]
+                end
               end
 
               b[i, j, k, f, v, h] = l_b[1]
