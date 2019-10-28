@@ -190,7 +190,7 @@ let
   # Ne_horz = 6*6*6
 
   # Dycoms
-  Nfields = 6
+  Nfields = 5
   Ne_vert = 60
   Ne_horz = 22*22
   FT = Float64
