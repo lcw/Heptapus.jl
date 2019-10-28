@@ -51,9 +51,9 @@ function forward!(b, L, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
               # vi = 1
               idx = jj + p
               fi = (idx % Nfields) + 1
-              idx = idx ÷ Nfields
-              ki = (idx % Nq) + 1
-              vi = (idx ÷ Nq) + 1
+              idx2 = idx ÷ Nfields
+              ki = (idx2 % Nq) + 1
+              vi = (idx2 ÷ Nq) + 1
               # Note: read out of bounds to avoid local load and stores
               if idx < n
                 l_b[p + 1] = b[i, j, ki, fi, vi, h]
