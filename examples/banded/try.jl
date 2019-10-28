@@ -208,6 +208,9 @@ let
   L = extract_banded(F.L, p, 0)
   U = extract_banded(F.U, 0, q)
 
+  # L = repeat(reshape(repeat(L, inner=(Nq*Nq, 1)), Nq, Nq, p+1, n), outer=(1,1,1,1,Ne_horz))
+  # @show size(L)
+
   b = rand(FT, Nq, Nq, Nq, Nfields, Ne_vert, Ne_horz)
   borig = copy(b)
   x = similar(b)
