@@ -37,11 +37,8 @@ function forward!(b, L::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
               @unroll for ii = 2:p+1
-                if N == 2
-                  l_b[ii] -= L[ii, jj] * l_b[1]
-                else
-                  l_b[ii] -= L[i, j, ii, jj, h] * l_b[1]
-                end
+                Lii = N == 2 ? L[ii, jj] : L[i, j, ii, jj, h]
+                l_b[ii] -= Lii * l_b[1]
               end
 
               b[i, j, k, f, v, h] = l_b[1]
@@ -50,16 +47,16 @@ function forward!(b, L::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_
                 l_b[ii] = l_b[ii + 1]
               end
 
-              # ki = 1
-              # fi = 1
-              # vi = 1
-              idx = jj + p
-              fi = (idx % Nfields) + 1
-              idx2 = idx ÷ Nfields
-              ki = (idx2 % Nq) + 1
-              vi = (idx2 ÷ Nq) + 1
-              # Note: read out of bounds to avoid local load and stores
-              if idx < n
+              # idx = jj + p
+              # fi = (idx % Nfields) + 1
+              # idx2 = idx ÷ Nfields
+              # ki = (idx2 % Nq) + 1
+              # vi = (idx2 ÷ Nq) + 1
+
+              if jj + p < n
+                (idx, fi) = fldmod1(jj + p + 1, Nfields)
+                (vi, ki) = fldmod1(idx, Nq)
+
                 l_b[p + 1] = b[i, j, ki, fi, vi, h]
               end
             end
@@ -72,8 +69,8 @@ function forward!(b, L::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_
   nothing
 end
 
-function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
-                   ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+function backward!(b, U::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
+                   ::Val{Ne_horz}) where {T, N, Nq, Nfields, Ne_vert, Ne_horz}
   FT = eltype(b)
   n = Nfields * Nq * Ne_vert
   q = Nfields * Nq
@@ -83,8 +80,8 @@ function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
   @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for j in (1:Nq; threadIdx().y)
       @loop for i in (1:Nq; threadIdx().x)
-        for k = Nq:-1:1
-          for f = Nfields:-1:1
+        @unroll for k = Nq:-1:1
+          @unroll for f = Nfields:-1:1
             ii  = f + (k - 1) * Nfields
             l_b[ii+1] =  b[i, j, k, f, Ne_vert, h]
           end
@@ -92,18 +89,19 @@ function backward!(b, U, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
         l_b[1] = Ne_vert > 1 ? b[i, j, Nq, Nfields, Ne_vert-1, h] : zero(FT)
 
 
-        @unroll for v = Ne_vert:-1:1
+        for v = Ne_vert:-1:1
           @unroll for k = Nq:-1:1
             @unroll for f = Nfields:-1:1
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
               l_b[q + 1] /= U[q + 1, jj]
 
-              b[i, j, k, f, v, h] = l_b[q + 1]
-
               @unroll for ii = 1:q
-                l_b[ii] -= U[ii, jj] * l_b[q + 1]
+                Uii = N == 2 ? U[ii, jj] : U[i, j, ii, jj, h]
+                l_b[ii] -= Uii * l_b[q + 1]
               end
+
+              b[i, j, k, f, v, h] = l_b[q + 1]
 
               @unroll for ii = q:-1:1
                 l_b[ii+1] = l_b[ii]
@@ -209,7 +207,7 @@ let
   U = extract_banded(F.U, 0, q)
 
   # L = repeat(reshape(repeat(L, inner=(Nq*Nq, 1)), Nq, Nq, p+1, n), outer=(1,1,1,1,Ne_horz))
-  # @show size(L)
+  # U = repeat(reshape(repeat(U, inner=(Nq*Nq, 1)), Nq, Nq, p+1, n), outer=(1,1,1,1,Ne_horz))
 
   b = rand(FT, Nq, Nq, Nq, Nfields, Ne_vert, Ne_horz)
   borig = copy(b)
