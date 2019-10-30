@@ -189,7 +189,9 @@ function extract_banded!(B::AbstractMatrix, A::AbstractMatrix, p, q)
 end
 
 function extract_banded(A::AbstractMatrix, p, q)
-  extract_banded!(similar(A, p + q + 1, size(A, 2)), A, p, q)
+  B = similar(A, p + q + 1, size(A, 2))
+  fill!(B, 0)
+  extract_banded!(B, A, p, q)
 end
 
 let
