@@ -20,7 +20,7 @@ function forward!(b, L::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_
 
   l_b = MArray{Tuple{p+1}, FT}(undef)
 
-  @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
+  @inbounds @loop for h in (1:Ne_horz; (blockIdx().x-1) * blockDim().z + threadIdx().z)
     @loop for j in (1:Nq; threadIdx().y)
       @loop for i in (1:Nq; threadIdx().x)
         @unroll for k = 1:Nq
@@ -77,7 +77,7 @@ function backward!(b, U::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields}, ::Val{N
 
   l_b = MArray{Tuple{q+1}, FT}(undef)
 
-  @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
+  @inbounds @loop for h in (1:Ne_horz; (blockIdx().x-1) * blockDim().z + threadIdx().z)
     @loop for j in (1:Nq; threadIdx().y)
       @loop for i in (1:Nq; threadIdx().x)
         @unroll for k = Nq:-1:1
@@ -228,8 +228,8 @@ let
   d_U = DefaultArray(U)
   d_b = DefaultArray(b)
 
-  threads = (Nq, Nq)
-  blocks = Ne_horz
+  threads = (Nq, Nq, 2)
+  blocks = cld(Ne_horz, threads[3])
 
   @launch(CPU(), threads=threads, blocks=blocks, forward!(b, L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
   @launch(CPU(), threads=threads, blocks=blocks, backward!(b, U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
