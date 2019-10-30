@@ -216,9 +216,44 @@ let
 end
 
 let
+  Nq = 2
+  Nfields = 2
+  Ne_vert = 10
+  Ne_horz = 2
+
+  FT = Float64
+  m = n = Nq * Nfields * Ne_vert
+  p = q = Nq * Nfields
+
+  A = Array(brand(FT, m, n, p, q)) + 10I
+  F = lu(A, Val(false))
+
+  A = extract_banded(A, p, q)
+  L = extract_banded(F.L, p, 0)
+  U = extract_banded(F.U, 0, q)
+
+  A = repeat(reshape(repeat(A, inner=(Nq*Nq, 1)), Nq, Nq, p+q+1, n), outer=(1,1,1,1,Ne_horz))
+  L = repeat(reshape(repeat(L, inner=(Nq*Nq, 1)), Nq, Nq, p+1,   n), outer=(1,1,1,1,Ne_horz))
+  U = repeat(reshape(repeat(U, inner=(Nq*Nq, 1)), Nq, Nq, q+1,   n), outer=(1,1,1,1,Ne_horz))
+
+  threads = (Nq, Nq)
+  blocks = Ne_horz
+  @launch(CPU(), threads=threads, blocks=blocks, band_lu!(A, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+
+  LL = A[:, :, q+1:end, :, :]
+  LL[:, :, 1,:, :] .= one(eltype(LL))
+  UU = A[:, :, 1:q+1, :, :]
+
+  @test U ≈ UU
+  @test L ≈ LL
+
+end
+
+let
 
   N = 5
   Nq = N + 1
+
   # H-S
   # Nfields = 5
   # Ne_vert = 8
@@ -228,23 +263,22 @@ let
   Nfields = 5
   Ne_vert = 60
   Ne_horz = 22*22
-  FT = Float64
 
+  FT = Float64
   m = n = Nq * Nfields * Ne_vert
   p = q = Nq * Nfields
 
-  A = Array(brand(FT, m, n, p, q))
+  A = Array(brand(FT, m, n, p, q)) + 10I
   F = lu(A, Val(false))
 
   # display(spy(A))
   # display(spy(F.L))
   # display(spy(F.U))
 
+  A = extract_banded(A, p, q)
   L = extract_banded(F.L, p, 0)
   U = extract_banded(F.U, 0, q)
 
-  # L = repeat(reshape(repeat(L, inner=(Nq*Nq, 1)), Nq, Nq, p+1, n), outer=(1,1,1,1,Ne_horz))
-  # U = repeat(reshape(repeat(U, inner=(Nq*Nq, 1)), Nq, Nq, p+1, n), outer=(1,1,1,1,Ne_horz))
 
   b = rand(FT, Nq, Nq, Nq, Nfields, Ne_vert, Ne_horz)
   borig = copy(b)
@@ -261,13 +295,26 @@ let
   DefaultArray = has_cuda() ? CuArray : Array
   device = has_cuda() ? CUDA() : CPU()
 
-  d_L = DefaultArray(L)
-  d_U = DefaultArray(U)
+  # d_L = repeat(reshape(repeat(DefaultArray(L), inner=(Nq*Nq, 1)), Nq, Nq, p+1, n), outer=(1,1,1,1,Ne_horz))
+  # d_U = repeat(reshape(repeat(DefaultArray(U), inner=(Nq*Nq, 1)), Nq, Nq, q+1, n), outer=(1,1,1,1,Ne_horz))
+
+  d_A = repeat(reshape(repeat(DefaultArray(A), inner=(Nq*Nq, 1)), Nq, Nq, p+q+1, n), outer=(1,1,1,1,Ne_horz))
+
+  threads = (Nq, Nq)
+  blocks = Ne_horz
+  @launch(device, threads=threads, blocks=blocks, band_lu!(d_A, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+
+  d_L = d_A[:, :, q+1:end, :, :]
+  d_L[:, :, 1,:, :] .= one(eltype(d_L))
+  d_U = d_A[:, :, 1:q+1, :, :]
+
   d_b = DefaultArray(b)
 
   threads = (Nq, Nq)
   blocks = Ne_horz
 
+  L = Array(d_L)
+  U = Array(d_U)
   @launch(CPU(), threads=threads, blocks=blocks, forward!(b, L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
   @launch(CPU(), threads=threads, blocks=blocks, backward!(b, U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
 
