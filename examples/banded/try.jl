@@ -123,6 +123,41 @@ function backward!(b, U::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields}, ::Val{N
   nothing
 end
 
+
+function band_lu!(A, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
+                 ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+  FT = eltype(A)
+  n = Nfields * Nq * Ne_vert
+  p = q = Nfields * Nq
+
+  @loop for h in (1:Ne_horz; blockIdx().x)
+    @loop for j in (1:Nq; threadIdx().y)
+      @loop for i in (1:Nq; threadIdx().x)
+        for v = 1:Ne_vert
+          for k = 1:Nq
+            for f = 1:Nfields
+              kk = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
+
+              for ii = 1:p
+                A[i, j, q + ii + 1, kk, h] /= A[i, j, q + 1, kk, h]
+              end
+
+              for jj = 1:q
+                for ii = 1:p
+                  if jj + kk ≤ n
+                    A[i, j, q + ii - jj + 1, jj + kk, h] -=
+                        A[i, j, q + ii + 1, kk, h] * A[i, j, q - jj + 1, jj + kk, h]
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
 function band_forward!(b, L, p)
   n = size(b, 1)
   for j = 1:n, i = (j+1):min(j+p, n)
