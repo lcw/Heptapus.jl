@@ -94,7 +94,7 @@ function backward!(b, U::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields}, ::Val{N
             @unroll for f = Nfields:-1:1
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
-              l_b[q + 1] /= U[q + 1, jj]
+              l_b[q + 1] /= N == 2 ? U[q + 1, jj] : U[i, j, q + 1, jj, h]
 
               @unroll for ii = 1:q
                 Uii = N == 2 ? U[ii, jj] : U[i, j, ii, jj, h]
