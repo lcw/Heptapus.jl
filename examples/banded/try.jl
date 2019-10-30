@@ -6,6 +6,7 @@ using CUDAapi # this will NEVER fail
 if has_cuda()
   try
     using CUDAnative, CuArrays
+    CuArrays.allowscalar(false)
   catch ex
     # something is wrong with the user's set-up (or there's a bug in CuArrays)
     @warn "CUDA is installed, but CuArrays.jl fails to load" exception=(ex,catch_backtrace())
@@ -298,7 +299,7 @@ let
   # d_L = repeat(reshape(repeat(DefaultArray(L), inner=(Nq*Nq, 1)), Nq, Nq, p+1, n), outer=(1,1,1,1,Ne_horz))
   # d_U = repeat(reshape(repeat(DefaultArray(U), inner=(Nq*Nq, 1)), Nq, Nq, q+1, n), outer=(1,1,1,1,Ne_horz))
 
-  d_A = repeat(reshape(repeat(DefaultArray(A), inner=(Nq*Nq, 1)), Nq, Nq, p+q+1, n), outer=(1,1,1,1,Ne_horz))
+  d_A = DefaultArray(repeat(reshape(repeat(A, inner=(Nq*Nq, 1)), Nq, Nq, p+q+1, n), outer=(1,1,1,1,Ne_horz)))
 
   threads = (Nq, Nq)
   blocks = Ne_horz
