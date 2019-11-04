@@ -13,24 +13,30 @@ if has_cuda()
   end
 end
 
-function forward!(b, LU::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
-                  ::Val{Ne_horz}) where {T, N, Nq, Nfields, Ne_vert, Ne_horz}
+function forward!(b, LU::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields},
+                  ::Val{Ne_vert}, ::Val{Ne_horz},
+                  ::Val{element_bandwidth}) where {T, N, Nq, Nfields,
+                                                   Ne_vert, Ne_horz,
+                                                   element_bandwidth}
   FT = eltype(b)
   n = Nfields * Nq * Ne_vert
-  p = q = Nfields * Nq
+  p = q = element_bandwidth * Nfields * Nq
 
   l_b = MArray{Tuple{p+1}, FT}(undef)
 
   @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for j in (1:Nq; threadIdx().y)
       @loop for i in (1:Nq; threadIdx().x)
-        @unroll for k = 1:Nq
-          @unroll for f = 1:Nfields
-            ii  = f + (k - 1) * Nfields
-            l_b[ii] =  b[i, j, k, f, 1, h]
+        @unroll for v = 1:element_bandwidth
+          @unroll for k = 1:Nq
+            @unroll for f = 1:Nfields
+              ii  = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
+              l_b[ii] =  Ne_vert ≥ v ? b[i, j, k, f, v, h] : zero(FT)
+            end
           end
         end
-        l_b[p+1] = Ne_vert > 1 ? b[i, j, 1, 1, 2, h] : zero(FT)
+        l_b[p+1] = Ne_vert > element_bandwidth ?
+            b[i, j, 1, 1, element_bandwidth+1, h] : zero(FT)
 
         for v = 1:Ne_vert
           @unroll for k = 1:Nq
@@ -70,24 +76,30 @@ function forward!(b, LU::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne
   nothing
 end
 
-function backward!(b, LU::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
-                   ::Val{Ne_horz}) where {T, N, Nq, Nfields, Ne_vert, Ne_horz}
+function backward!(b, LU::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields},
+                   ::Val{Ne_vert}, ::Val{Ne_horz},
+                   ::Val{element_bandwidth}) where {T, N, Nq, Nfields,
+                                                    Ne_vert, Ne_horz,
+                                                    element_bandwidth}
   FT = eltype(b)
   n = Nfields * Nq * Ne_vert
-  q = Nfields * Nq
+  q = Nfields * Nq * element_bandwidth
 
   l_b = MArray{Tuple{q+1}, FT}(undef)
 
   @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for j in (1:Nq; threadIdx().y)
       @loop for i in (1:Nq; threadIdx().x)
-        @unroll for k = Nq:-1:1
-          @unroll for f = Nfields:-1:1
-            ii  = f + (k - 1) * Nfields
-            l_b[ii+1] =  b[i, j, k, f, Ne_vert, h]
+        @unroll for v = Ne_vert:-1:(Ne_vert - element_bandwidth + 1)
+          @unroll for k = Nq:-1:1
+            @unroll for f = Nfields:-1:1
+              ii  = f + (k - 1) * Nfields + (Ne_vert - v) * Nfields * Nq
+              l_b[ii+1] =  b[i, j, k, f, v, h]
+            end
           end
         end
-        l_b[1] = Ne_vert > 1 ? b[i, j, Nq, Nfields, Ne_vert-1, h] : zero(FT)
+        l_b[1] = Ne_vert - element_bandwidth > 0 ?
+            b[i, j, Nq, Nfields, Ne_vert - element_bandwidth, h] : zero(FT)
 
 
         for v = Ne_vert:-1:1
@@ -126,10 +138,12 @@ end
 
 
 function band_lu!(A, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
-                 ::Val{Ne_horz}) where {Nq, Nfields, Ne_vert, Ne_horz}
+                  ::Val{Ne_horz},
+                  ::Val{element_bandwidth}) where {Nq, Nfields, Ne_vert,
+                                                   Ne_horz, element_bandwidth}
   FT = eltype(A)
   n = Nfields * Nq * Ne_vert
-  p = q = Nfields * Nq
+  p = q = Nfields * Nq * element_bandwidth
 
   @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for j in (1:Nq; threadIdx().y)
@@ -221,10 +235,11 @@ let
   Nfields = 2
   Ne_vert = 10
   Ne_horz = 2
+  EB = 2
 
   FT = Float64
   m = n = Nq * Nfields * Ne_vert
-  p = q = Nq * Nfields
+  p = q = Nq * Nfields * EB
 
   A = Array(brand(FT, m, n, p, q)) + 10I
   F = lu(A, Val(false))
@@ -239,7 +254,7 @@ let
 
   threads = (Nq, Nq)
   blocks = Ne_horz
-  @launch(CPU(), threads=threads, blocks=blocks, band_lu!(A, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(CPU(), threads=threads, blocks=blocks, band_lu!(A, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz), Val(EB)))
 
   LL = A[:, :, q+1:end, :, :]
   LL[:, :, 1,:, :] .= one(eltype(LL))
@@ -264,10 +279,11 @@ let
   Nfields = 5
   Ne_vert = 60
   Ne_horz = 22*22
+  EB = 1
 
   FT = Float64
   m = n = Nq * Nfields * Ne_vert
-  p = q = Nq * Nfields
+  p = q = Nq * Nfields * EB
 
   A = Array(brand(FT, m, n, p, q)) + 10I
   F = lu(A, Val(false))
@@ -303,7 +319,7 @@ let
 
   threads = (Nq, Nq)
   blocks = Ne_horz
-  @launch(device, threads=threads, blocks=blocks, band_lu!(d_A, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(device, threads=threads, blocks=blocks, band_lu!(d_A, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz), Val(EB)))
   d_LU = d_A
 
   # d_L = d_A[:, :, q+1:end, :, :]
@@ -316,13 +332,13 @@ let
   blocks = Ne_horz
 
   LU = Array(d_LU)
-  @launch(CPU(), threads=threads, blocks=blocks, forward!(b, LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
-  @launch(CPU(), threads=threads, blocks=blocks, backward!(b, LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(CPU(), threads=threads, blocks=blocks, forward!(b, LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz), Val(EB)))
+  @launch(CPU(), threads=threads, blocks=blocks, backward!(b, LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz), Val(EB)))
 
   @test x ≈ Array(b)
 
-  @launch(device, threads=threads, blocks=blocks, forward!(d_b, d_LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
-  @launch(device, threads=threads, blocks=blocks, backward!(d_b, d_LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(device, threads=threads, blocks=blocks, forward!(d_b, d_LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz), Val(EB)))
+  @launch(device, threads=threads, blocks=blocks, backward!(d_b, d_LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz), Val(EB)))
 
   @test x ≈ Array(d_b)
 end
