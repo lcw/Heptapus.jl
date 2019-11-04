@@ -145,7 +145,7 @@ function band_lu!(A, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
   n = Nfields * Nq * Ne_vert
   p = q = Nfields * Nq * element_bandwidth
 
-  @loop for h in (1:Ne_horz; blockIdx().x)
+  @inbounds @loop for h in (1:Ne_horz; blockIdx().x)
     @loop for j in (1:Nq; threadIdx().y)
       @loop for i in (1:Nq; threadIdx().x)
         for v = 1:Ne_vert
@@ -153,15 +153,17 @@ function band_lu!(A, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
             for f = 1:Nfields
               kk = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
+              Aq = A[i, j, q + 1, kk, h]
               for ii = 1:p
-                A[i, j, q + ii + 1, kk, h] /= A[i, j, q + 1, kk, h]
+                A[i, j, q + ii + 1, kk, h] /= Aq
               end
 
               for jj = 1:q
-                for ii = 1:p
-                  if jj + kk ≤ n
+                if jj + kk ≤ n
+                  Ajj = A[i, j, q - jj + 1, jj + kk, h]
+                  for ii = 1:p
                     A[i, j, q + ii - jj + 1, jj + kk, h] -=
-                        A[i, j, q + ii + 1, kk, h] * A[i, j, q - jj + 1, jj + kk, h]
+                        A[i, j, q + ii + 1, kk, h] * Ajj
                   end
                 end
               end
