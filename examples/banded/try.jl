@@ -13,11 +13,11 @@ if has_cuda()
   end
 end
 
-function forward!(b, L::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
+function forward!(b, LU::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
                   ::Val{Ne_horz}) where {T, N, Nq, Nfields, Ne_vert, Ne_horz}
   FT = eltype(b)
   n = Nfields * Nq * Ne_vert
-  p = Nfields * Nq
+  p = q = Nfields * Nq
 
   l_b = MArray{Tuple{p+1}, FT}(undef)
 
@@ -38,7 +38,7 @@ function forward!(b, L::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
               @unroll for ii = 2:p+1
-                Lii = N == 2 ? L[ii, jj] : L[i, j, ii, jj, h]
+                Lii = N == 2 ? LU[ii+q, jj] : LU[i, j, ii+q, jj, h]
                 l_b[ii] -= Lii * l_b[1]
               end
 
@@ -70,7 +70,7 @@ function forward!(b, L::AbstractArray{T,N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_
   nothing
 end
 
-function backward!(b, U::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
+function backward!(b, LU::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields}, ::Val{Ne_vert},
                    ::Val{Ne_horz}) where {T, N, Nq, Nfields, Ne_vert, Ne_horz}
   FT = eltype(b)
   n = Nfields * Nq * Ne_vert
@@ -95,10 +95,10 @@ function backward!(b, U::AbstractArray{T, N}, ::Val{Nq}, ::Val{Nfields}, ::Val{N
             @unroll for f = Nfields:-1:1
               jj = f + (k - 1) * Nfields + (v - 1) * Nfields * Nq
 
-              l_b[q + 1] /= N == 2 ? U[q + 1, jj] : U[i, j, q + 1, jj, h]
+              l_b[q + 1] /= N == 2 ? LU[q + 1, jj] : LU[i, j, q + 1, jj, h]
 
               @unroll for ii = 1:q
-                Uii = N == 2 ? U[ii, jj] : U[i, j, ii, jj, h]
+                Uii = N == 2 ? LU[ii, jj] : LU[i, j, ii, jj, h]
                 l_b[ii] -= Uii * l_b[q + 1]
               end
 
@@ -304,25 +304,25 @@ let
   threads = (Nq, Nq)
   blocks = Ne_horz
   @launch(device, threads=threads, blocks=blocks, band_lu!(d_A, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  d_LU = d_A
 
-  d_L = d_A[:, :, q+1:end, :, :]
-  d_L[:, :, 1,:, :] .= one(eltype(d_L))
-  d_U = d_A[:, :, 1:q+1, :, :]
+  # d_L = d_A[:, :, q+1:end, :, :]
+  # d_L[:, :, 1,:, :] .= one(eltype(d_L))
+  # d_U = d_A[:, :, 1:q+1, :, :]
 
   d_b = DefaultArray(b)
 
   threads = (Nq, Nq)
   blocks = Ne_horz
 
-  L = Array(d_L)
-  U = Array(d_U)
-  @launch(CPU(), threads=threads, blocks=blocks, forward!(b, L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
-  @launch(CPU(), threads=threads, blocks=blocks, backward!(b, U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  LU = Array(d_LU)
+  @launch(CPU(), threads=threads, blocks=blocks, forward!(b, LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(CPU(), threads=threads, blocks=blocks, backward!(b, LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
 
   @test x ≈ Array(b)
 
-  @launch(device, threads=threads, blocks=blocks, forward!(d_b, d_L, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
-  @launch(device, threads=threads, blocks=blocks, backward!(d_b, d_U, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(device, threads=threads, blocks=blocks, forward!(d_b, d_LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
+  @launch(device, threads=threads, blocks=blocks, backward!(d_b, d_LU, Val(Nq), Val(Nfields), Val(Ne_vert), Val(Ne_horz)))
 
   @test x ≈ Array(d_b)
 end
