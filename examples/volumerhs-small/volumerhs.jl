@@ -74,6 +74,7 @@ Base.@irrational gdm1 0.4 BigFloat(0.4)
 
 function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
     Nq = N + 1
+    Np = Nq ^ 3
 
     s_D = @cuStaticSharedMem eltype(D) (Nq, Nq)
     s_F = @cuStaticSharedMem eltype(Q) (Nq, Nq, _nstate)
@@ -89,6 +90,9 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
     j = threadIdx().y
     i = threadIdx().x
 
+    common_gid = i + (j-1)*Nq + (e-1)*Np*_nvgeo
+    common_qid = i + (j-1)*Nq + (e-1)*Np*_nstate
+
     # fetch D into shared
     @inbounds s_D[i, j] = D[i, j]
 
@@ -101,15 +105,30 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
     end
 
     @inbounds @unroll for k in 1:Nq
-        # Load values will need into registers
-        MJ = vgeo[i, j, k, _MJ, e]
-        ξx, ξy, ξz = vgeo[i,j,k,_ξx,e], vgeo[i,j,k,_ξy,e], vgeo[i,j,k,_ξz,e]
-        ηx, ηy, ηz = vgeo[i,j,k,_ηx,e], vgeo[i,j,k,_ηy,e], vgeo[i,j,k,_ηz,e]
-        ζx, ζy, ζz = vgeo[i,j,k,_ζx,e], vgeo[i,j,k,_ζy,e], vgeo[i,j,k,_ζz,e]
-        z = vgeo[i,j,k,_z,e]
+        sync_threads()
 
-        U, V, W = Q[i, j, k, _U, e], Q[i, j, k, _V, e], Q[i, j, k, _W, e]
-        ρ, E = Q[i, j, k, _ρ, e], Q[i, j, k, _E, e]
+        gid = common_gid + (k-1)*Nq*Nq
+
+        # Load values will need into registers
+        MJ = ldg(vgeo, gid + (_MJ - 1) * Np)
+        ξx = ldg(vgeo, gid + (_ξx - 1) * Np)
+        ξy = ldg(vgeo, gid + (_ξy - 1) * Np)
+        ξz = ldg(vgeo, gid + (_ξz - 1) * Np)
+        ηx = ldg(vgeo, gid + (_ηx - 1) * Np)
+        ηy = ldg(vgeo, gid + (_ηy - 1) * Np)
+        ηz = ldg(vgeo, gid + (_ηz - 1) * Np)
+        ζx = ldg(vgeo, gid + (_ζx - 1) * Np)
+        ζy = ldg(vgeo, gid + (_ζy - 1) * Np)
+        ζz = ldg(vgeo, gid + (_ζz - 1) * Np)
+        z  = ldg(vgeo, gid + (_z - 1) * Np)
+
+        qid = common_qid + (k-1)*Nq*Nq
+
+        U  = ldg(Q, qid + (_U - 1) * Np)
+        V  = ldg(Q, qid + (_V - 1) * Np)
+        W  = ldg(Q, qid + (_W - 1) * Np)
+        ρ  = ldg(Q, qid + (_ρ - 1) * Np)
+        E  = ldg(Q, qid + (_E - 1) * Np)
 
         P = gdm1*(E - (U^2 + V^2 + W^2)/(2*ρ) - ρ*gravity*z)
 
@@ -132,8 +151,6 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
         fluxV_z = ρinv * W * V
         fluxW_z = ρinv * W * W + P
         fluxE_z = ρinv * W * (E + P)
-
-        sync_threads()
 
         s_F[i, j,  _ρ] = MJ * (ξx * fluxρ_x + ξy * fluxρ_y + ξz * fluxρ_z)
         s_F[i, j,  _U] = MJ * (ξx * fluxU_x + ξy * fluxU_y + ξz * fluxU_z)
@@ -191,7 +208,8 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
     end
 
     @inbounds @unroll for k in 1:Nq
-        MJI = vgeo[i, j, k, _MJI, e]
+        gid = common_gid + (k-1)*Nq*Nq
+        MJI = ldg(vgeo, gid + (_MJI - 1) * Np)
 
         rhs[i, j, k, _U, e] += MJI*r_rhsU[k]
         rhs[i, j, k, _V, e] += MJI*r_rhsV[k]
@@ -226,6 +244,8 @@ function main()
 
     @cuda(threads=(N+1, N+1), blocks=nelem, maxregs=255,
           volumerhs!(Val(N), rhs, Q, vgeo, DFloat(grav), D, nelem))
+
+    @show sum(rhs)
 
     CUDAdrv.@profile  begin
         @cuda(threads=(N+1, N+1), blocks=nelem, maxregs=255,
