@@ -211,11 +211,13 @@ function volumerhs!(::Val{N}, rhs, Q, vgeo, gravity, D, nelem) where {N}
         gid = common_gid + (k-1)*Nq*Nq
         MJI = ldg(vgeo, gid + (_MJI - 1) * Np)
 
-        rhs[i, j, k, _U, e] += MJI*r_rhsU[k]
-        rhs[i, j, k, _V, e] += MJI*r_rhsV[k]
-        rhs[i, j, k, _W, e] += MJI*r_rhsW[k]
-        rhs[i, j, k, _ρ, e] += MJI*r_rhsρ[k]
-        rhs[i, j, k, _E, e] += MJI*r_rhsE[k]
+        qid = common_qid + (k-1)*Nq*Nq
+
+        rhs[qid + (_U - 1) * Np] += MJI*r_rhsU[k]
+        rhs[qid + (_V - 1) * Np] += MJI*r_rhsV[k]
+        rhs[qid + (_W - 1) * Np] += MJI*r_rhsW[k]
+        rhs[qid + (_ρ - 1) * Np] += MJI*r_rhsρ[k]
+        rhs[qid + (_E - 1) * Np] += MJI*r_rhsE[k]
     end
 
     nothing
@@ -244,8 +246,6 @@ function main()
 
     @cuda(threads=(N+1, N+1), blocks=nelem, maxregs=255,
           volumerhs!(Val(N), rhs, Q, vgeo, DFloat(grav), D, nelem))
-
-    @show sum(rhs)
 
     CUDAdrv.@profile  begin
         @cuda(threads=(N+1, N+1), blocks=nelem, maxregs=255,
