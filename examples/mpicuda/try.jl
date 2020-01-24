@@ -8,6 +8,23 @@ function pin!(a)
   finalizer(_ -> Mem.unregister(ad), a)
 end
 
+function kernel!(c, a, b)
+  i = (blockIdx().x-1) * blockDim().x + threadIdx().x
+  @inbounds a_val = a[i]
+  @inbounds b_val = b[i]
+  @inbounds c_val = c[i]
+
+  for j in 1:99
+    a_val = CUDAnative.fma(a_val, b_val, c_val)
+    b_val = CUDAnative.fma(a_val, b_val, c_val)
+    c_val = CUDAnative.fma(a_val, b_val, c_val)
+  end
+
+  @inbounds c[i] = CUDAnative.fma(a_val, b_val, c_val)
+
+  return
+end
+
 function main()
   if !MPI.Initialized()
     MPI.Init()
@@ -21,18 +38,46 @@ function main()
 
   MPI.Barrier(comm)
 
+  dst_rank = mod(MPI.Comm_rank(comm)+1, MPI.Comm_size(comm))
+  src_rank = mod(MPI.Comm_rank(comm)-1, MPI.Comm_size(comm))
+
   T = Float32
-  nbytes=1024^2
+  M = 1024
+  N = M*10
 
-  a = rand(T, nbytes÷sizeof(T))
-  pin!(a)
+  A = CuArray(rand(T, M, N))
+  B = CuArray(rand(T, M, N))
+  C = CuArray(rand(T, M, N))
+  d = CuArray(rand(T, M))
 
-  b = CuArray{T}(undef, size(a))
+  b = Array{T}(undef, M)
+  c = Array{T}(undef, M)
+  pin!(b)
+  pin!(c)
 
-  unsafe_copyto!(pointer(a), pointer(b), length(a), async=true, stream=stm)
-  unsafe_copyto!(pointer(b), pointer(a), length(a), async=true, stream=stm)
+  len = length(A)
+  threads = min(len, 1024)
+  blocks = len ÷ threads
+
+  unsafe_copyto!(pointer(b), pointer(B), M, async=true, stream=stm)
+  @cuda threads=threads blocks=blocks kernel!(C, A, B)
 
   synchronize(stm)
+
+  rreq = MPI.Irecv!(c, src_rank, 222, comm)
+  sreq = MPI.Isend(b, dst_rank, 222, comm)
+  stats = MPI.Waitall!([sreq, rreq])
+
+  unsafe_copyto!(pointer(d), pointer(c), M, async=true, stream=stm)
+
+  synchronize(stm)
+  synchronize()
+
+  unsafe_copyto!(pointer(C), pointer(d), M, async=true, stream=stm)
+  @cuda threads=threads blocks=blocks stream=stm kernel!(C, A, B)
+
+  synchronize(stm)
+  synchronize()
 end
 
 main()
