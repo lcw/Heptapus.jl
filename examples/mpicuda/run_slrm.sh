@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 #SBATCH --job-name=test_mpi_cudanative
 #SBATCH --output=out_%j.txt
