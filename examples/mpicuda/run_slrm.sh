@@ -17,7 +17,7 @@ module load compile/gcc/7.2.0 openmpi/3.0.0 lib/cuda/10.1.243
 # If launching with `srun` then replace `OMPI_COMM_WORLD_RANK` with
 # `SLURM_PROCID`.
 
-mpirun nvprof -o "timeline_rank_%q{OMPI_COMM_WORLD_RANK}_job_%q{SLURM_JOBID}" \
+mpirun nvprof -o "timeline_job_%q{SLURM_JOBID}_rank_%q{OMPI_COMM_WORLD_RANK}" \
               --context-name "MPI Rank %q{OMPI_COMM_WORLD_RANK}" \
               --process-name "MPI Rank %q{OMPI_COMM_WORLD_RANK}" \
               --annotate-mpi openmpi \
