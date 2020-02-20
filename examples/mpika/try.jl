@@ -23,6 +23,12 @@ using KernelAbstractions: CudaEvent, Event
   return
 end
 
+@kernel function mpikernel!(c, b, src_rank, dst_rank)
+  rreq = MPI.Irecv!(c, src_rank, 222, comm)
+  sreq = MPI.Isend(b, dst_rank, 222, comm)
+  stats = MPI.Waitall!([sreq, rreq])
+end
+
 function pin!(a)
   ad = Mem.register(Mem.Host, pointer(a), sizeof(a))
   finalizer(_ -> Mem.unregister(ad), a)
@@ -92,13 +98,8 @@ function main()
   for j = 1:100
     copyevent = async_copyto!(pointer(b), pointer(B), M, stream=copystream, dependencies=compevent)
     compevent = kernel!(CUDA(), 256)(C, A, B, ndrange=length(C), dependencies=compevent)
-
-    wait(copyevent)
-    rreq = MPI.Irecv!(c, src_rank, 222, comm)
-    sreq = MPI.Isend(b, dst_rank, 222, comm)
-
-    stats = MPI.Waitall!([sreq, rreq])
-    copyevent = async_copyto!(pointer(d), pointer(c), M, stream=copystream)
+    copyevent = mpikernel!(CPU(), 1)(c, b, src_rank, dst_rank, ndrange=1, dependencies=copyevent)
+    copyevent = async_copyto!(pointer(d), pointer(c), M, stream=copystream, dependencies=copyevent)
     copyevent = async_copyto!(pointer(C), pointer(d), M, stream=copystream, dependencies=copyevent)
     compevent = kernel!(CUDA(), 256)(C, A, B, ndrange=length(C), dependencies=copyevent)
   end
