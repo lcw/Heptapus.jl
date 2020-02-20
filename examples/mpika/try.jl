@@ -6,7 +6,7 @@ using MPI
 using KernelAbstractions: CudaEvent, Event
 
 @kernel function kernel!(c, @Const(a), @Const(b))
-  i = (blockIdx().x-1) * blockDim().x + threadIdx().x
+  i = @index(Global)
 
   @inbounds a_val = a[i]
   @inbounds b_val = b[i]
