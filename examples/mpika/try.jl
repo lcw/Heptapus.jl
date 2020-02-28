@@ -23,7 +23,7 @@ using KernelAbstractions: CudaEvent, Event
   return
 end
 
-@kernel function mpikernel!(c, b, src_rank, dst_rank)
+@kernel function mpikernel!(c, b, src_rank, dst_rank, comm)
   rreq = MPI.Irecv!(c, src_rank, 222, comm)
   sreq = MPI.Isend(b, dst_rank, 222, comm)
   stats = MPI.Waitall!([sreq, rreq])
@@ -47,8 +47,11 @@ function async_copyto!(destptr, srcptr, N::Integer; stream=CuDefaultStream(),
   end
   if dependencies !== nothing
     for event in dependencies
-      @assert event isa CudaEvent
-      CUDAdrv.wait(event.event, stream)
+      if event isa CudaEvent
+        CUDAdrv.wait(event.event, stream)
+      else
+        KernelAbstractions.wait(event)
+      end
     end
   end
 
@@ -98,7 +101,7 @@ function main()
   for j = 1:100
     copyevent = async_copyto!(pointer(b), pointer(B), M, stream=copystream, dependencies=compevent)
     compevent = kernel!(CUDA(), 256)(C, A, B, ndrange=length(C), dependencies=compevent)
-    copyevent = mpikernel!(CPU(), 1)(c, b, src_rank, dst_rank, ndrange=1, dependencies=copyevent)
+    copyevent = mpikernel!(CPU(), 1)(c, b, src_rank, dst_rank, comm, ndrange=1, dependencies=copyevent)
     copyevent = async_copyto!(pointer(d), pointer(c), M, stream=copystream, dependencies=copyevent)
     copyevent = async_copyto!(pointer(C), pointer(d), M, stream=copystream, dependencies=copyevent)
     compevent = kernel!(CUDA(), 256)(C, A, B, ndrange=length(C), dependencies=copyevent)
