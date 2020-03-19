@@ -51,19 +51,29 @@ version = "0.3.1"
 
 [[CuArrays]]
 deps = ["AbstractFFTs", "Adapt", "CEnum", "CUDAapi", "CUDAdrv", "CUDAnative", "DataStructures", "GPUArrays", "Libdl", "LinearAlgebra", "MacroTools", "NNlib", "Printf", "Random", "Requires", "SparseArrays", "TimerOutputs"]
-git-tree-sha1 = "7c20c5a45bb245cf248f454d26966ea70255b271"
+git-tree-sha1 = "7fa1331a0e0cd10e43b94b280027bda45990cb63"
 uuid = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
-version = "1.7.2"
+version = "1.7.3"
 
 [[DataStructures]]
 deps = ["InteractiveUtils", "OrderedCollections"]
-git-tree-sha1 = "b7720de347734f4716d1815b00ce5664ed6bbfd4"
+git-tree-sha1 = "5a431d46abf2ef2a4d5d00bd0ae61f651cf854c8"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.17.9"
+version = "0.17.10"
+
+[[Dates]]
+deps = ["Printf"]
+uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+
+[[DocStringExtensions]]
+deps = ["LibGit2", "Markdown", "Pkg", "Test"]
+git-tree-sha1 = "88bb0edb352b16608036faadcc071adda068582a"
+uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+version = "0.8.1"
 
 [[GPUArrays]]
 deps = ["AbstractFFTs", "Adapt", "LinearAlgebra", "Printf", "Random", "Serialization"]
@@ -76,18 +86,19 @@ deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[KernelAbstractions]]
-deps = ["Adapt", "CUDAapi", "CUDAdrv", "CUDAnative", "Cassette", "Requires", "StaticArrays"]
-git-tree-sha1 = "a08af802248922ebfca1df031d06a44390ffe21f"
-repo-rev = "master"
-repo-url = "https://github.com/JuliaGPU/KernelAbstractions.jl"
+deps = ["Adapt", "CUDAapi", "CUDAdrv", "CUDAnative", "Cassette", "MacroTools", "Requires", "StaticArrays"]
+git-tree-sha1 = "4b7d01e8fa1ec7c8654962fb25c6ce0447cbaf5f"
 uuid = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
-version = "0.1.0"
+version = "0.1.5"
 
 [[LLVM]]
 deps = ["CEnum", "Libdl", "Printf", "Unicode"]
-git-tree-sha1 = "1d08d7e4250f452f6cb20e4574daaebfdbee0ff7"
+git-tree-sha1 = "b6b86801ae2f2682e0a4889315dc76b68db2de71"
 uuid = "929cbde3-209d-540e-8aea-75f648917ca0"
-version = "1.3.3"
+version = "1.3.4"
+
+[[LibGit2]]
+uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 
 [[Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -100,10 +111,10 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
 [[MPI]]
-deps = ["Distributed", "Libdl", "Random", "Requires", "Serialization", "Sockets"]
-git-tree-sha1 = "958dff41198353e1aa1092efa911c07cbd894193"
+deps = ["Distributed", "DocStringExtensions", "Libdl", "Random", "Requires", "Serialization", "Sockets"]
+git-tree-sha1 = "a01349600200a1cb2157fd91e6d19e38642273ed"
 uuid = "da04e1cc-30fd-572f-bb4f-1f8673147195"
-version = "0.10.1"
+version = "0.12.0"
 
 [[MacroTools]]
 deps = ["DataStructures", "Markdown", "Random"]
@@ -117,9 +128,9 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[NNlib]]
 deps = ["BinaryProvider", "Libdl", "LinearAlgebra", "Requires", "Statistics"]
-git-tree-sha1 = "755c0bab3912ff782167e1b4b774b833f8a0e550"
+git-tree-sha1 = "d9f196d911f55aeaff11b11f681b135980783824"
 uuid = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
-version = "0.6.4"
+version = "0.6.6"
 
 [[OrderedCollections]]
 deps = ["Random", "Serialization", "Test"]
@@ -127,9 +138,17 @@ git-tree-sha1 = "c4c13474d23c60d20a67b217f1d7f22a40edf8f1"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 version = "1.1.0"
 
+[[Pkg]]
+deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Test", "UUIDs"]
+uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+
 [[Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+
+[[REPL]]
+deps = ["InteractiveUtils", "Markdown", "Sockets"]
+uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[Random]]
 deps = ["Serialization"]
