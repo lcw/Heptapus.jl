@@ -16,7 +16,7 @@ end
 
 function __Isend!(request, buf, dst, tag, comm)
     @info "Send" buf dst tag
-    request[1] = MPI.Isend!(buf, dst, tag, comm)
+    request[1] = MPI.Isend(buf, dst, tag, comm)
 end
 
 function __testall!(requests; dependencies=nothing)
