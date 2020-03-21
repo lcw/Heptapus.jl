@@ -87,9 +87,11 @@ uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[KernelAbstractions]]
 deps = ["Adapt", "CUDAapi", "CUDAdrv", "CUDAnative", "Cassette", "MacroTools", "Requires", "StaticArrays"]
-git-tree-sha1 = "4b7d01e8fa1ec7c8654962fb25c6ce0447cbaf5f"
+git-tree-sha1 = "23bb79c8372be3b8a6226a0a06b4a307dd4c2b7b"
+repo-rev = "vc/events_take_two"
+repo-url = "https://github.com/JuliaGPU/KernelAbstractions.jl.git"
 uuid = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
-version = "0.1.5"
+version = "0.1.6"
 
 [[LLVM]]
 deps = ["CEnum", "Libdl", "Printf", "Unicode"]

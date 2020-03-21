@@ -1,7 +1,14 @@
-using CuArrays
-using CUDAdrv
 using KernelAbstractions
+using  CUDAapi
+if CUDAapi.has_cuda_gpu()
+    using CuArrays
+    using CUDAdrv
+    CuArrays.allowscalar(false)
+else
+    exit()
+end
 using MPI
+using Test
 
 device(A) = typeof(A) <: Array ? CPU() : CUDA()
 
@@ -11,17 +18,14 @@ function mpiyield()
 end
 
 function __Irecv!(request, buf, src, tag, comm)
-    @info "Recv" buf src tag
     request[1] = MPI.Irecv!(buf, src, tag, comm)
 end
 
 function __Isend!(request, buf, dst, tag, comm)
-    @info "Send" buf dst tag
     request[1] = MPI.Isend(buf, dst, tag, comm)
 end
 
 function __testall!(requests; dependencies=nothing)
-    @info "Testall" requests
     done = false
     while !done
         done, _ = MPI.Testall!(requests)
@@ -29,25 +33,21 @@ function __testall!(requests; dependencies=nothing)
     end
 end
 
-function __print_buf(buf)
-    @info "printing buf" buf
-end
-
-function exchange!(h_send_buf, d_recv_buf, h_recv_buf, src_rank, dst_rank,
-                   send_request, recv_request, comm; dependencies=nothing)
+function exchange!(d_send_buf, h_send_buf, d_recv_buf, h_recv_buf, src_rank,
+                   dst_rank, send_request, recv_request, comm;
+                   dependencies=nothing)
 
     event = Event(__Irecv!, recv_request, h_recv_buf, src_rank, 666, comm;
-                  dependencies = dependencies)
-    event = Event(__testall!, recv_request; dependencies = event)
-    # Works:
-    # recv_event = Event(copyto!, d_recv_buf, h_recv_buf; dependencies = event)
-    # Fails:
+                  dependencies = dependencies, progress=mpiyield)
+    event = Event(__testall!, recv_request; dependencies = event, progress=mpiyield)
     recv_event = async_copy!(device(d_recv_buf), d_recv_buf, h_recv_buf;
-                             dependencies = event)
+                             dependencies = event, progress=mpiyield)
 
+    event = async_copy!(device(d_send_buf), h_send_buf, d_send_buf;
+                             dependencies = dependencies, progress=mpiyield)
     event = Event(__Isend!, send_request, h_send_buf, dst_rank, 666, comm;
-                  dependencies = dependencies)
-    send_event = Event(__testall!, send_request; dependencies = event)
+                  dependencies = event, progress=mpiyield)
+    send_event = Event(__testall!, send_request; dependencies = event, progress=mpiyield)
 
     return recv_event, send_event
 end
@@ -65,12 +65,14 @@ function main()
     T = Int64
     M = 10
 
+    d_send_buf = CuArrays.zeros(T, M)
     d_recv_buf = CuArrays.zeros(T, M)
     h_send_buf = zeros(T, M)
     h_recv_buf = zeros(T, M)
 
+    fill!(d_send_buf, MPI.Comm_rank(comm))
     fill!(d_recv_buf, -1)
-    fill!(h_send_buf, MPI.Comm_rank(comm))
+    fill!(h_send_buf, -1)
     fill!(h_recv_buf, -1)
 
     send_request = fill(MPI.REQUEST_NULL, 1)
@@ -78,13 +80,13 @@ function main()
 
     synchronize()
 
-    recv_event, send_event = exchange!(h_send_buf, d_recv_buf, h_recv_buf,
-                                       src_rank, dst_rank, send_request,
-                                       recv_request, comm)
-    wait(CPU(), recv_event, yield)
-    wait(CPU(), send_event, yield)
+    recv_event, send_event = exchange!(d_send_buf, h_send_buf, d_recv_buf,
+                                       h_recv_buf, src_rank, dst_rank,
+                                       send_request, recv_request, comm)
+    wait(recv_event)
+    wait(send_event)
 
-    @assert all(d_recv_buf .== src_rank)
+    @test all(d_recv_buf .== src_rank)
 end
 
 main()
