@@ -83,8 +83,8 @@ function main()
     recv_event, send_event = exchange!(d_send_buf, h_send_buf, d_recv_buf,
                                        h_recv_buf, src_rank, dst_rank,
                                        send_request, recv_request, comm)
-    wait(recv_event)
-    wait(send_event)
+    wait(CUDA(), recv_event)
+    wait(CUDA(), send_event)
 
     @test all(d_recv_buf .== src_rank)
 end
