@@ -76,14 +76,14 @@ struct Roofline
             cmd = `nvprof -u ms --csv --metrics $(join(metrics,",")) --log-file $f $command`
             @info "Getting metrics" cmd
             run(cmd)
-            Table(CSV.File(f, comment="=", allowmissing=:none))
+            Table(CSV.File(f, comment="="))
         end
 
         t = mktemp() do f, _
             cmd = `nvprof -u ms --csv --log-file $f $command`
             @info "Getting timings" cmd
             run(cmd)
-            Table(CSV.File(f, comment="=", allowmissing=:none, datarow=3))
+            Table(CSV.File(f, comment="=", datarow=3))
         end
 
         kernels = unique(s.Kernel)
