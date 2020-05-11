@@ -4,6 +4,14 @@ using TypedTables, CSV, CUDAdrv
 
 export empiricalbandwidth, Roofline
 
+function transfer!(A, B, N, stream)
+    GC.@preserve A B begin
+        destptr = pointer(A)
+        srcptr  = pointer(B)
+        unsafe_copyto!(destptr, srcptr, N, async=true, stream=stream)
+    end
+end
+
 """
     empiricalbandwidth(nbytes=2*1024^3; devicenumber=0, numtests=10)
 
@@ -14,16 +22,17 @@ bandwidth is an average of `ntests`.
 function empiricalbandwidth(nbytes=2*1024^3; devicenumber=0, ntests=10)
     dev = CuDevice(devicenumber)
     ctx = CuContext(dev)
+    stream = CuStream(; flags = CUDAdrv.STREAM_NON_BLOCKING) 
 
-    a = Mem.alloc(nbytes÷2)
-    b = Mem.alloc(nbytes÷2)
+    a = Mem.alloc(Mem.DeviceBuffer, nbytes÷2)
+    b = Mem.alloc(Mem.DeviceBuffer, nbytes÷2)
 
-    Mem.transfer!(a, b, nbytes÷2, async=true)
-    Mem.transfer!(b, a, nbytes÷2, async=true)
+    transfer!(a, b, nbytes÷2, stream)
+    transfer!(b, a, nbytes÷2, stream)
 
-    t = CUDAdrv.@elapsed for n = 1:ntests
-        Mem.transfer!(a, b, nbytes÷2, async=true)
-        Mem.transfer!(b, a, nbytes÷2, async=true)
+    t = CUDAdrv.@elapsed stream for n = 1:ntests
+        transfer!(a, b, nbytes÷2, stream)
+        transfer!(b, a, nbytes÷2, stream)
     end
 
     Mem.free(a)
@@ -67,14 +76,14 @@ struct Roofline
             cmd = `nvprof -u ms --csv --metrics $(join(metrics,",")) --log-file $f $command`
             @info "Getting metrics" cmd
             run(cmd)
-            Table(CSV.File(f, comment="=", allowmissing=:none))
+            Table(CSV.File(f, comment="="))
         end
 
         t = mktemp() do f, _
             cmd = `nvprof -u ms --csv --log-file $f $command`
             @info "Getting timings" cmd
             run(cmd)
-            Table(CSV.File(f, comment="=", allowmissing=:none, datarow=3))
+            Table(CSV.File(f, comment="=", datarow=3))
         end
 
         kernels = unique(s.Kernel)
