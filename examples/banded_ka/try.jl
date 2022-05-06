@@ -168,8 +168,8 @@ let
   Nqh = prod(Nq[1:end-1])
   Nqv = Nq[end]
 
-  #Neh = 1350
-  Neh = 10
+  Neh = 1350
+  #Neh = 10
   Nev = 15
 
   kl = Nqv * Nfields
@@ -177,8 +177,8 @@ let
 
   n = Nfields * Nev * Nqv
 
-  T, AT = (Float64,  Array)
-  # T, AT = (Float64, CuArray)
+  # T, AT = (Float64,  Array)
+  T, AT = (Float64, CuArray)
 
   sA = Array(brand(T, n, n, kl, ku)) + 10I
   sF = lu(sA, Val(false))
@@ -192,11 +192,14 @@ let
   bU = extract_banded(sF.U, 0, ku)
 
   A = AT(repeat(reshape(repeat(bA, inner=(Nqh, 1)), Nqh, kl+ku+1, n), outer=(1, 1, 1, Neh)))
-  event = Event(get_device(A))
-  kernel! = bandedlu_kernel!(get_device(A), (Nqh,))
-  event = kernel!(A, Val(Nqh), Val(n), Val(ku), Val(kl), Val(Neh);
-                  ndrange = (Nqh * Neh,), dependencies = (event,))
-  wait(event)
+
+  CUDA.@profile begin
+      event = Event(get_device(A))
+      kernel! = bandedlu_kernel!(get_device(A), (Nqh,))
+      event = kernel!(A, Val(Nqh), Val(n), Val(ku), Val(kl), Val(Neh);
+                      ndrange = (Nqh * Neh,), dependencies = (event,))
+      wait(event)
+  end
 
   L = repeat(reshape(repeat(bL, inner=(Nqh, 1)), Nqh, kl+1,    n), outer=(1, 1, 1, Neh))
   U = repeat(reshape(repeat(bU, inner=(Nqh, 1)), Nqh, ku+1,    n), outer=(1, 1, 1, Neh))
@@ -219,14 +222,16 @@ let
   b = AT(bb)
   x = similar(b)
 
-  event = Event(get_device(A))
-  kernel! = banded_forward_kernel!(get_device(A), (Nqh,))
-  event = kernel!(x, A, b, Val(Nqh), Val(n), Val(ku), Val(kl), Val(Neh);
-                  ndrange = (Nqh * Neh,), dependencies = (event,))
-  kernel! = banded_backward_kernel!(get_device(A), (Nqh,))
-  event = kernel!(x, A, x, Val(Nqh), Val(n), Val(ku), Val(kl), Val(Neh);
-                  ndrange = (Nqh * Neh,), dependencies = (event,))
-  wait(event)
+  CUDA.@profile begin
+      event = Event(get_device(A))
+      kernel! = banded_forward_kernel!(get_device(A), (Nqh,))
+      event = kernel!(x, A, b, Val(Nqh), Val(n), Val(ku), Val(kl), Val(Neh);
+                      ndrange = (Nqh * Neh,), dependencies = (event,))
+      kernel! = banded_backward_kernel!(get_device(A), (Nqh,))
+      event = kernel!(x, A, x, Val(Nqh), Val(n), Val(ku), Val(kl), Val(Neh);
+                      ndrange = (Nqh * Neh,), dependencies = (event,))
+      wait(event)
+  end
 
   @test xx ≈ Array(x)
 end
